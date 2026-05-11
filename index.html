@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>SolarFeed IoT | Smart Food Dispenser Dashboard</title>
+    <!-- Supabase JS library for realtime & interactions -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Font Awesome 6 (free icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(145deg, #e9f5e9 0%, #c8e6c9 100%);
+            min-height: 100vh;
+            padding: 2rem 1.5rem;
+        }
+
+        .dashboard-container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1e3c2c, #2b6e3c);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 i {
+            background: none;
+            -webkit-background-clip: unset;
+            background-clip: unset;
+            color: #2e7d32;
+            font-size: 2rem;
+        }
+
+        .sub {
+            color: #2c5e2e;
+            margin-top: 6px;
+            opacity: 0.8;
+            font-weight: 500;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.8rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(0px);
+            border-radius: 32px;
+            box-shadow: 0 15px 35px rgba(0, 32, 0, 0.1);
+            padding: 1.5rem 1.2rem;
+            transition: transform 0.2s ease, box-shadow 0.2s;
+            border: 1px solid rgba(70, 130, 70, 0.2);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 25px 40px rgba(40, 90, 30, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid #d0e6cf;
+            padding-bottom: 0.8rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .card-header i {
+            font-size: 1.8rem;
+            color: #2b6e3c;
+        }
+
+        .card-header h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #1a3b2a;
+        }
+
+        .status-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin: 0.6rem 0 0.2rem;
+        }
+
+        .distance-cm {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .unit {
+            font-size: 1rem;
+            font-weight: normal;
+            color: #4a6741;
+        }
+
+        .level-badge {
+            display: inline-block;
+            padding: 0.3rem 1rem;
+            border-radius: 60px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        .warning-text {
+            color: #b91c1c;
+            background: #ffe5e5;
+            border-radius: 24px;
+            padding: 6px 12px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .servo-btn {
+            background: #2e7d32;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 40px;
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 1rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .servo-btn.open {
+            background: #1f5e2a;
+        }
+
+        .servo-btn.closed {
+            background: #b45309;
+        }
+
+        .servo-btn:hover {
+            filter: brightness(1.05);
+            transform: scale(0.98);
+        }
+
+        .status-badge {
+            font-weight: 600;
+            font-size: 1.2rem;
+            padding: 0.4rem 0;
+        }
+
+        .timestamp {
+            font-size: 0.8rem;
+            color: #4e6e3e;
+            background: #edf7e6;
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 30px;
+            margin-top: 12px;
+        }
+
+        .history-section {
+            background: white;
+            border-radius: 32px;
+            padding: 1.6rem;
+            box-shadow: 0 12px 28px rgba(0, 20, 0, 0.08);
+            margin-top: 1rem;
+        }
+
+        .history-section h3 {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 1.4rem;
+            color: #1f4f2b;
+            margin-bottom: 1rem;
+        }
+
+        .history-log {
+            max-height: 280px;
+            overflow-y: auto;
+            border-radius: 24px;
+            background: #f9fff7;
+        }
+
+        .log-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid #ddecdb;
+            font-size: 0.9rem;
+        }
+
+        .log-entry span:first-child {
+            font-family: monospace;
+            font-weight: 500;
+        }
+
+        .log-level {
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 40px;
+            background: #eaf7e4;
+        }
+
+        .emergency {
+            background: #ffefef;
+            border-left: 4px solid #e3342f;
+        }
+
+        .empty-warning {
+            background: #ffdddd;
+            border-left: 4px solid red;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.75rem;
+            color: #3c6e3a;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .flex-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="dashboard-container">
+        <div class="header">
+            <h1><i class="fas fa-solar-panel"></i> SolarFeed <span style="font-weight: 300;">|</span> Smart Dispenser
+            </h1>
+            <div class="sub"><i class="fas fa-microchip"></i> ESP32 · Solar Powered · Servo: 90° Closed → 40° Open</div>
+        </div>
+
+        <div class="cards-grid">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-utensils"></i>
+                    <h3>Food Level</h3>
+                </div>
+                <div class="status-value" id="foodLevelDisplay">--</div>
+                <div id="levelBadge" class="level-badge">⚡ Loading...</div>
+                <div class="flex-row" style="margin-top: 12px;">
+                    <span><i class="fas fa-ruler"></i> Distance:</span>
+                    <span class="distance-cm" id="distanceCm">-- <span class="unit">cm</span></span>
+                </div>
+                <div id="warningMsg" class="warning-text" style="margin-top: 12px; display: none;">
+                    <i class="fas fa-exclamation-triangle"></i> Low / Empty! Refill soon
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-cogs"></i>
+                    <h3>Gate Servo</h3>
+                </div>
+                <div class="status-badge" id="servoStatusText">
+                    <i class="fas fa-circle" style="font-size: 0.7rem; color: gray;"></i> Unknown
+                </div>
+                <div
+                    style="margin-top: 12px; font-size: 0.8rem; background: #eef5ea; padding: 8px; border-radius: 16px;">
+                    <i class="fas fa-chart-line"></i> Servo angles:
+                    <strong>Closed: 90°</strong> |
+                    <strong>Open: 40°</strong>
+                </div>
+                <button id="servoControlBtn" class="servo-btn">
+                    <i class="fas fa-power-off"></i> <span id="btnLabel">Connect / Toggle</span>
+                </button>
+                <div class="timestamp" id="lastUpdateLocal">
+                    <i class="far fa-clock"></i> Last update: --
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-leaf"></i>
+                    <h3>System Health</h3>
+                </div>
+                <div><i class="fas fa-battery-full"></i> Solar power: <strong>ACTIVE</strong> <span
+                        style="color: #2b6e3c;">✔️</span></div>
+                <div style="margin-top: 12px;"><i class="fas fa-microphone-alt"></i> Sensor: Ultrasonic HC-SR04</div>
+                <div><i class="fas fa-database"></i> Backend: Supabase Realtime</div>
+                <div id="supabaseStatus"
+                    style="margin-top: 12px; background:#eef5ea; border-radius: 20px; padding: 6px 10px;">
+                    <i class="fas fa-sync-alt"></i> Live updates via Supabase
+                </div>
+            </div>
+        </div>
+
+        <div class="history-section">
+            <h3><i class="fas fa-history"></i> Feeding & Sensor History</h3>
+            <div id="historyLog" class="history-log">
+                <div style="padding: 1rem; text-align: center; color: #6b8c5c;">Loading history from Supabase...</div>
+            </div>
+        </div>
+        <footer>
+            <i class="fas fa-wifi"></i> ESP32 posts sensor data to Supabase | ultrasonic (GPIO27, GPIO25) | servo
+            (GPIO13) | Manual toggle updates gate state
+        </footer>
+    </div>
+
+    <script>
+        // ============================================
+        // YOUR SUPABASE CREDENTIALS (Already configured)
+        // ============================================
+        const SUPABASE_URL = 'https://pjmuvnyztjgpbxkxjeti.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqbXV2bnl6dGpncGJ4a3hqZXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MTA5NDAsImV4cCI6MjA5Mzk4Njk0MH0.M07zEn_oLiB2dBdjBeVOnP3EXA5ZTBscs8k7EGNvZVk';
+
+        let supabaseClient = null;
+        let isSupabaseConfigured = false;
+        let currentServoState = 'Closed';
+        let currentDistance = null;
+        let currentFoodLevel = '--';
+
+        // DOM elements
+        const foodLevelSpan = document.getElementById('foodLevelDisplay');
+        const levelBadgeDiv = document.getElementById('levelBadge');
+        const distanceSpan = document.getElementById('distanceCm');
+        const warningMsgDiv = document.getElementById('warningMsg');
+        const servoStatusSpan = document.getElementById('servoStatusText');
+        const servoBtn = document.getElementById('servoControlBtn');
+        const btnLabelSpan = document.getElementById('btnLabel');
+        const lastUpdateSpan = document.getElementById('lastUpdateLocal');
+        const historyContainer = document.getElementById('historyLog');
+        const supabaseStatus = document.getElementById('supabaseStatus');
+
+        function formatTimestamp(dateObj) {
+            if (!dateObj) return 'Just now';
+            const d = new Date(dateObj);
+            return d.toLocaleString();
+        }
+
+        function getFoodLevelFromDistance(cm) {
+            if (cm === null || isNaN(cm)) return 'Unknown';
+            if (cm <= 10) return 'Full';
+            if (cm <= 20) return 'Medium';
+            if (cm <= 35) return 'Low';
+            return 'Empty';
+        }
+
+        function updateUIFromDistance(dist) {
+            if (dist === null) return;
+            currentDistance = dist;
+            const level = getFoodLevelFromDistance(dist);
+            currentFoodLevel = level;
+            distanceSpan.innerText = dist.toFixed(1);
+            foodLevelSpan.innerText = level;
+
+            let badgeColor = '';
+            let icon = '';
+            if (level === 'Full') { badgeColor = '#2b6e3c'; icon = '🍽️ '; }
+            else if (level === 'Medium') { badgeColor = '#e6a017'; icon = '🟡 '; }
+            else if (level === 'Low') { badgeColor = '#e67e22'; icon = '⚠️ '; }
+            else { badgeColor = '#d9534f'; icon = '🔴 '; }
+            levelBadgeDiv.innerHTML = `${icon} ${level}`;
+            levelBadgeDiv.style.background = badgeColor + '20';
+            levelBadgeDiv.style.color = badgeColor;
+            levelBadgeDiv.style.border = `1px solid ${badgeColor}60`;
+
+            if (level === 'Low' || level === 'Empty') {
+                warningMsgDiv.style.display = 'flex';
+                warningMsgDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${level} food level! Refill container soon.`;
+            } else {
+                warningMsgDiv.style.display = 'none';
+            }
+        }
+
+        function updateServoUI(state) {
+            currentServoState = state;
+            if (state === 'Open') {
+                servoStatusSpan.innerHTML = '<i class="fas fa-circle" style="color:#2ecc71;"></i> Gate: OPEN · dispensing (40°)';
+                servoBtn.classList.remove('closed');
+                servoBtn.classList.add('open');
+                btnLabelSpan.innerHTML = '<i class="fas fa-door-closed"></i> Close Gate → 90°';
+            } else {
+                servoStatusSpan.innerHTML = '<i class="fas fa-circle" style="color:#e67e22;"></i> Gate: CLOSED · standby (90°)';
+                servoBtn.classList.remove('open');
+                servoBtn.classList.add('closed');
+                btnLabelSpan.innerHTML = '<i class="fas fa-door-open"></i> Open Gate → 40°';
+            }
+        }
+
+        function renderHistoryLog(entries) {
+            if (!entries || entries.length === 0) {
+                historyContainer.innerHTML = '<div style="padding: 1rem; text-align: center;">📭 No sensor logs yet. Send data from ESP32.</div>';
+                return;
+            }
+            historyContainer.innerHTML = '';
+            entries.slice().reverse().forEach(entry => {
+                const logDiv = document.createElement('div');
+                logDiv.className = 'log-entry';
+                if (entry.food_level === 'Empty' || entry.food_level === 'Low') logDiv.classList.add('empty-warning');
+                const timeStr = entry.created_at ? formatTimestamp(entry.created_at) : 'recent';
+                logDiv.innerHTML = `
+                    <span><i class="fas fa-microchip"></i> ${entry.distance_cm?.toFixed(1)} cm · ${entry.food_level}</span>
+                    <span class="log-level">${entry.food_level}</span>
+                    <span style="font-size:0.7rem; color:#5e7a4a;">${timeStr}</span>
+                `;
+                historyContainer.appendChild(logDiv);
+            });
+        }
+
+        async function fetchLatestData() {
+            if (!supabaseClient || !isSupabaseConfigured) return;
+            try {
+                const { data: sensorData, error: sensorErr } = await supabaseClient
+                    .from('sensor_readings')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                if (!sensorErr && sensorData && sensorData.length > 0) {
+                    const latest = sensorData[0];
+                    updateUIFromDistance(latest.distance_cm);
+                    lastUpdateSpan.innerHTML = `<i class="far fa-clock"></i> Last data: ${formatTimestamp(latest.created_at)}`;
+                }
+
+                const { data: servoData, error: servoErr } = await supabaseClient
+                    .from('servo_state')
+                    .select('*')
+                    .limit(1);
+                if (!servoErr && servoData && servoData.length > 0) {
+                    updateServoUI(servoData[0].state);
+                }
+
+                const { data: history, error: histErr } = await supabaseClient
+                    .from('sensor_readings')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+                if (!histErr && history) {
+                    renderHistoryLog(history);
+                }
+            } catch (err) {
+                console.error("Supabase fetch error:", err);
+            }
+        }
+
+        async function toggleServoState() {
+            if (!supabaseClient || !isSupabaseConfigured) {
+                alert("⚠️ Supabase not connected. Check your internet or Supabase credentials.");
+                return;
+            }
+            const targetState = currentServoState === 'Closed' ? 'Open' : 'Closed';
+            try {
+                const { error } = await supabaseClient
+                    .from('servo_state')
+                    .update({ state: targetState, updated_at: new Date().toISOString() })
+                    .eq('id', 1);
+
+                if (error) {
+                    const { error: upsertErr } = await supabaseClient
+                        .from('servo_state')
+                        .upsert({ id: 1, state: targetState, updated_at: new Date().toISOString() });
+                    if (upsertErr) throw upsertErr;
+                }
+                updateServoUI(targetState);
+                await addManualActionLog(targetState);
+                await fetchLatestData();
+            } catch (err) {
+                console.error('Toggle failed', err);
+                alert('Error updating servo state: ' + err.message);
+            }
+        }
+
+        async function addManualActionLog(servoStateAction) {
+            if (!supabaseClient || !isSupabaseConfigured) return;
+            if (currentDistance !== null) {
+                const level = getFoodLevelFromDistance(currentDistance);
+                await supabaseClient.from('sensor_readings').insert({
+                    distance_cm: currentDistance,
+                    food_level: level,
+                    created_at: new Date().toISOString(),
+                    note: `Manual gate ${servoStateAction}`
+                });
+            }
+        }
+
+        async function initSupabase() {
+            try {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                isSupabaseConfigured = true;
+
+                // Test connection
+                const { error } = await supabaseClient.from('sensor_readings').select('count', { count: 'exact', head: true });
+                if (error) {
+                    console.error("Table missing or RLS error:", error);
+                    supabaseStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ⚠️ Tables missing. Run SQL schema first.';
+                    isSupabaseConfigured = false;
+                    return;
+                }
+
+                supabaseStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✅ Connected to Supabase';
+
+                // Realtime subscriptions
+                supabaseClient.channel('public:sensor_readings')
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sensor_readings' }, () => {
+                        fetchLatestData();
+                    })
+                    .subscribe();
+
+                supabaseClient.channel('public:servo_state')
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'servo_state' }, (payload) => {
+                        if (payload.new) updateServoUI(payload.new.state);
+                    })
+                    .subscribe();
+
+                await fetchLatestData();
+                servoBtn.onclick = toggleServoState;
+
+                console.log("✅ Supabase initialized successfully - Real mode active!");
+            } catch (err) {
+                console.error('Supabase init error:', err);
+                supabaseStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ❌ Connection failed';
+                isSupabaseConfigured = false;
+            }
+        }
+
+        initSupabase();
+    </script>
+</body>
+
+</html>

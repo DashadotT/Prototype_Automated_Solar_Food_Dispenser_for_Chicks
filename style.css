@@ -1,0 +1,214 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.header {
+    text-align: center;
+    color: white;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.header p {
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+.dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+}
+
+.card {
+    background: white;
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 12px;
+}
+
+.card-title .icon {
+    font-size: 32px;
+}
+
+.card-title h2 {
+    font-size: 1.4rem;
+    color: #4a5568;
+}
+
+.sensor-value {
+    text-align: center;
+    font-size: 3rem;
+    font-weight: bold;
+    color: #2d3748;
+    margin: 20px 0;
+}
+
+.sensor-value .unit {
+    font-size: 1.5rem;
+    color: #718096;
+}
+
+.status-badge {
+    text-align: center;
+    margin: 15px 0;
+}
+
+.status {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 50px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+}
+
+.status.full {
+    background: #48bb78;
+    color: white;
+}
+
+.status.medium {
+    background: #ed8936;
+    color: white;
+}
+
+.status.low {
+    background: #f56565;
+    color: white;
+}
+
+.status.unknown {
+    background: #a0aec0;
+    color: white;
+}
+
+.status.open {
+    background: #38b2ac;
+    color: white;
+}
+
+.status.closed {
+    background: #4a5568;
+    color: white;
+}
+
+.progress-container {
+    background: #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+    height: 20px;
+    margin-top: 15px;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #48bb78, #38a169);
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 10px;
+}
+
+.btn-dispense {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: white;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 15px 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-dispense:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-dispense:active {
+    transform: scale(0.98);
+}
+
+.note {
+    font-size: 0.85rem;
+    color: #718096;
+    text-align: center;
+    margin-top: 10px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.info-row span:first-child {
+    font-weight: 600;
+    color: #4a5568;
+}
+
+.info-row span:last-child {
+    color: #718096;
+}
+
+.footer {
+    text-align: center;
+    color: white;
+    padding: 20px;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .header h1 {
+        font-size: 1.5rem;
+    }
+
+    .sensor-value {
+        font-size: 2rem;
+    }
+}
