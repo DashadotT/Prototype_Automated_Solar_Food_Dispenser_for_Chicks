@@ -1,0 +1,210 @@
+// ============================================================
+// UPDATED solar_feeder.ino - FASTER RESPONSE
+// ============================================================
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <ESP32Servo.h>
+
+// ========== WiFi Credentials ==========
+const char* ssid = "Octat 2.4G";       // Change this
+const char* password = "Sunshine3030z"; // Change this
+
+// ========== Supabase Configuration ==========
+const char* supabaseUrl = "https://pjmuvnyztjgpbxkxjeti.supabase.co";     // Change this
+const char* supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqbXV2bnl6dGpncGJ4a3hqZXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MTA5NDAsImV4cCI6MjA5Mzk4Njk0MH0.M07zEn_oLiB2dBdjBeVOnP3EXA5ZTBscs8k7EGNvZVk";                   // Change this
+// Supabase REST API endpoints
+String sensorEndpoint = String(supabaseUrl) + "/rest/v1/sensor_readings";
+String servoEndpoint = String(supabaseUrl) + "/rest/v1/servo_state";
+
+// ========== Pin Definitions ==========
+#define TRIG_PIN 27
+#define ECHO_PIN 25
+#define SERVO_PIN 13
+
+// ========== Servo Positions ==========
+#define SERVO_CLOSED 90
+#define SERVO_OPEN 60
+
+// ========== Timing Intervals ==========
+unsigned long lastSensorRead = 0;
+const unsigned long SENSOR_INTERVAL = 5000;  // Read every 5 seconds (FASTER)
+
+unsigned long lastServoCheck = 0;
+const unsigned long SERVO_CHECK_INTERVAL = 1000;  // Check servo state EVERY SECOND!
+
+// ========== Global Variables ==========
+Servo foodGateServo;
+float lastDistance = 0.0;
+String currentServoState = "Closed";
+String lastServoState = "";
+
+// ========== Measure Distance ==========
+float measureDistance() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+  if (duration == 0) return 999.0;
+
+  return duration * 0.034 / 2;
+}
+
+// ========== Get Food Level ==========
+String getFoodLevelFromDistance(float cm) {
+  if (cm < 0) return "Unknown";
+  if (cm <= 10) return "Full";
+  if (cm <= 20) return "Medium";
+  if (cm <= 35) return "Low";
+  return "Empty";
+}
+
+// ========== Send Sensor Data ==========
+void sendSensorData(float distance, String foodLevel) {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.begin(sensorEndpoint);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("apikey", supabaseAnonKey);
+  http.addHeader("Authorization", String("Bearer ") + supabaseAnonKey);
+  http.addHeader("Prefer", "return=minimal");
+
+  StaticJsonDocument<200> doc;
+  doc["distance_cm"] = distance;
+  doc["food_level"] = foodLevel;
+
+  String jsonPayload;
+  serializeJson(doc, jsonPayload);
+
+  int httpResponseCode = http.POST(jsonPayload);
+  if (httpResponseCode > 0) {
+    Serial.printf("✅ Data sent: %.1f cm, %s\n", distance, foodLevel.c_str());
+  } else {
+    Serial.printf("❌ Send failed: %d\n", httpResponseCode);
+  }
+  http.end();
+}
+
+// ========== Get Servo State from Supabase ==========
+bool fetchServoState() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  HTTPClient http;
+  String url = String(servoEndpoint) + "?select=state&limit=1";
+  http.begin(url);
+  http.addHeader("apikey", supabaseAnonKey);
+  http.addHeader("Authorization", String("Bearer ") + supabaseAnonKey);
+
+  int httpResponseCode = http.GET();
+
+  if (httpResponseCode == 200) {
+    String response = http.getString();
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, response);
+
+    if (!error && doc[0]["state"].is<String>()) {
+      String newState = doc[0]["state"].as<String>();
+      if (newState != currentServoState) {
+        currentServoState = newState;
+        updateServoPosition();
+        Serial.printf("🔄 Servo changed to: %s\n", currentServoState.c_str());
+        return true;
+      }
+    }
+  }
+  http.end();
+  return false;
+}
+
+// ========== Update Servo Position ==========
+void updateServoPosition() {
+  if (currentServoState == "Open") {
+    foodGateServo.write(SERVO_OPEN);
+    Serial.printf("🔓 Servo → OPEN (%d°)\n", SERVO_OPEN);
+  } else {
+    foodGateServo.write(SERVO_CLOSED);
+    Serial.printf("🔒 Servo → CLOSED (%d°)\n", SERVO_CLOSED);
+  }
+}
+
+// ========== Connect WiFi ==========
+void connectWiFi() {
+  Serial.print("Connecting to WiFi");
+  WiFi.begin(ssid, password);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(1000);
+    Serial.print(".");
+    attempts++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ WiFi connected!");
+  } else {
+    Serial.println("\n❌ WiFi failed!");
+  }
+}
+
+// ========== Setup ==========
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  foodGateServo.attach(SERVO_PIN);
+  foodGateServo.write(SERVO_CLOSED);
+  currentServoState = "Closed";
+
+  Serial.println("🌱 Solar Food Dispenser Starting...");
+  Serial.printf("Servo: CLOSED=%d°, OPEN=%d°\n", SERVO_CLOSED, SERVO_OPEN);
+
+  connectWiFi();
+
+  // Send initial reading immediately
+  delay(1000);
+  float initDistance = measureDistance();
+  if (initDistance > 0.5 && initDistance < 400) {
+    sendSensorData(initDistance, getFoodLevelFromDistance(initDistance));
+  }
+
+  // Get initial servo state
+  fetchServoState();
+
+  Serial.println("✅ ESP32 Ready! Checking servo state every 1 second...");
+}
+
+// ========== Main Loop ==========
+void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    connectWiFi();
+  }
+
+  unsigned long now = millis();
+
+  // Read sensor every 5 seconds (FAST)
+  if (now - lastSensorRead >= SENSOR_INTERVAL) {
+    lastSensorRead = now;
+    float distance = measureDistance();
+    if (distance > 0.5 && distance < 400) {
+      lastDistance = distance;
+      String foodLevel = getFoodLevelFromDistance(distance);
+      sendSensorData(distance, foodLevel);
+    }
+  }
+
+  // Check servo state EVERY SECOND (INSTANT response)
+  if (now - lastServoCheck >= SERVO_CHECK_INTERVAL) {
+    lastServoCheck = now;
+    fetchServoState();  // This will update servo immediately if changed
+  }
+
+  delay(50);  // Small delay for stability
+}
