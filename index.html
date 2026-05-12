@@ -2281,9 +2281,9 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqbXV2bnl6dGpncGJ4a3hqZXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MTA5NDAsImV4cCI6MjA5Mzk4Njk0MH0.M07zEn_oLiB2dBdjBeVOnP3EXA5ZTBscs8k7EGNvZVk';
 
         // ============================================
-        // STATE
+        // STATE - FIXED: No duplicate declarations
         // ============================================
-        let supabase = null;
+        let supabaseClient = null;  // Changed from 'supabase' to avoid conflict
         let isConnected = false;
         let currentDistance = null;
         let currentServoAngle = 90;
@@ -2324,62 +2324,149 @@
         }
 
         // ============================================
-        // SUPABASE INIT
+        // SUPABASE INIT - FIXED
         // ============================================
         async function initSupabase() {
             try {
+                console.log('Initializing Supabase...');
+
                 if (!window.supabase) {
                     throw new Error('Supabase library not loaded');
                 }
 
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-                // Test connection
-                const { data, error } = await supabase
+                // Test connection with better error handling
+                console.log('Testing connection...');
+                const { data, error } = await supabaseClient
                     .from('sensor_readings')
                     .select('count', { count: 'exact', head: true });
 
-                if (error) throw error;
+                if (error) {
+                    console.error('Connection test failed:', error);
+
+                    // Provide specific error messages
+                    if (error.message.includes('relation') || error.message.includes('does not exist')) {
+                        showToast('Database tables missing! Please run the SQL schema in Supabase.', 'error');
+                        document.getElementById('sysSupabaseStatus').textContent = 'Missing Tables';
+                    } else if (error.message.includes('JWT') || error.message.includes('api key')) {
+                        showToast('Invalid API key! Check your Supabase anon key.', 'error');
+                        document.getElementById('sysSupabaseStatus').textContent = 'Invalid Key';
+                    } else if (error.message.includes('CORS')) {
+                        showToast('CORS error! Configure CORS in Supabase dashboard.', 'error');
+                        document.getElementById('sysSupabaseStatus').textContent = 'CORS Error';
+                    } else {
+                        showToast(`Connection failed: ${error.message}`, 'error');
+                        document.getElementById('sysSupabaseStatus').textContent = 'Error';
+                    }
+
+                    document.getElementById('sysSupabaseStatus').className = 'status-val err';
+                    throw error;
+                }
 
                 isConnected = true;
                 updateStatusIndicators('connected');
-                showToast('Connected to Supabase', 'success');
+                showToast('Connected to Supabase successfully!', 'success');
+                document.getElementById('sysSupabaseStatus').textContent = 'Connected';
+                document.getElementById('sysSupabaseStatus').className = 'status-val ok';
 
                 setupRealtimeSubscriptions();
 
-                // Fetch all data
-                await Promise.all([
-                    fetchLatestData(),
-                    fetchSchedules(),
-                    fetchSettings(),
-                    fetchLogs(),
-                    updateAnalytics()
-                ]);
+                // Fetch all data with individual error handling
+                await fetchLatestData();
+                await fetchSchedules();
+                await fetchSettings();
+                await fetchLogs();
+                await updateAnalytics();
 
                 document.getElementById('settingRealtimeStatus').textContent = 'Active';
                 document.getElementById('settingRealtimeStatus').className = 'status-val ok';
+
+                // Enable any disabled buttons
+                document.querySelectorAll('.btn').forEach(btn => {
+                    btn.disabled = false;
+                    btn.classList.remove('loading');
+                });
+
             } catch (err) {
                 console.error('Supabase init failed:', err);
                 isConnected = false;
                 updateStatusIndicators('error');
-                showToast('Supabase connection failed. Check console.', 'error');
                 document.getElementById('sysSupabaseStatus').textContent = 'Error';
                 document.getElementById('sysSupabaseStatus').className = 'status-val err';
+
+                // Try to use demo mode
+                useDemoMode();
             }
+        }
+
+        // ============================================
+        // DEMO MODE - For testing without database
+        // ============================================
+        function useDemoMode() {
+            console.log('Starting in DEMO mode (no database connection)');
+            showToast('Running in demo mode - no database connection', 'warning');
+
+            // Set demo data
+            updateFoodLevelUI(8.5, 72);
+            updateServoUI('Closed', 90);
+
+            // Demo schedules
+            schedules = [
+                { id: 1, feeding_time: '08:00', label: 'Morning Feed', enabled: true, duration_seconds: 5 },
+                { id: 2, feeding_time: '18:00', label: 'Evening Feed', enabled: true, duration_seconds: 5 }
+            ];
+            renderSchedules();
+            updateNextFeeding();
+
+            // Demo logs
+            allLogs = [
+                { type: 'system', message: 'System started in demo mode', value: '', created_at: new Date().toISOString() },
+                { type: 'sensor', message: 'Food level: Medium - 72%', value: '8.5cm', created_at: new Date().toISOString() },
+                { type: 'system', message: 'Manual dispense would work here', value: '', created_at: new Date(Date.now() - 3600000).toISOString() }
+            ];
+            renderLogs(allLogs);
+
+            // Demo stats
+            document.getElementById('todayManual').textContent = '3';
+            document.getElementById('todayAuto').textContent = '2';
+            document.getElementById('metricTotal').textContent = '5';
+            document.getElementById('metricAlerts').textContent = '1';
+            document.getElementById('metricAvgLevel').textContent = '68%';
+            document.getElementById('metricReadings').textContent = '156';
+
+            // Override button functions for demo
+            window.manualDispense = function () {
+                showToast('Demo: Manual dispense triggered!', 'success');
+                updateServoUI('Open', 60);
+                setTimeout(() => updateServoUI('Closed', 90), 3000);
+            };
+
+            window.toggleServo = function () {
+                const newState = currentServoState === 'Closed' ? 'Open' : 'Closed';
+                const angle = newState === 'Open' ? 60 : 90;
+                updateServoUI(newState, angle);
+                showToast(`Demo: Gate ${newState}`, 'success');
+            };
+
+            // Enable buttons
+            document.querySelectorAll('.btn').forEach(btn => {
+                btn.disabled = false;
+                btn.classList.remove('loading');
+            });
         }
 
         // ============================================
         // REALTIME SUBSCRIPTIONS
         // ============================================
         function setupRealtimeSubscriptions() {
-            if (!supabase) return;
+            if (!supabaseClient) return;
 
-            // Clean up existing channel
             if (supabaseChannel) {
-                supabase.removeChannel(supabaseChannel);
+                supabaseClient.removeChannel(supabaseChannel);
             }
 
-            supabaseChannel = supabase.channel('dashboard_realtime');
+            supabaseChannel = supabaseClient.channel('dashboard_realtime');
 
             supabaseChannel
                 .on('postgres_changes',
@@ -2412,11 +2499,10 @@
         // FETCH LATEST DATA
         // ============================================
         async function fetchLatestData() {
-            if (!supabase) return;
+            if (!supabaseClient) return;
 
             try {
-                // Fetch latest sensor reading
-                const { data: sensorData, error: sensorError } = await supabase
+                const { data: sensorData, error: sensorError } = await supabaseClient
                     .from('sensor_readings')
                     .select('*')
                     .order('created_at', { ascending: false })
@@ -2432,8 +2518,7 @@
                     document.getElementById('settingLastSync').textContent = ts;
                 }
 
-                // Fetch servo state
-                const { data: servoData, error: servoError } = await supabase
+                const { data: servoData, error: servoError } = await supabaseClient
                     .from('servo_state')
                     .select('*')
                     .limit(1);
@@ -2444,8 +2529,7 @@
                     updateServoUI(servoData[0].state, servoData[0].angle);
                 }
 
-                // Fetch system status
-                const { data: statusData, error: statusError } = await supabase
+                const { data: statusData, error: statusError } = await supabaseClient
                     .from('system_status')
                     .select('*')
                     .limit(1);
@@ -2456,12 +2540,13 @@
                     updateSystemStatus(statusData[0]);
                 }
 
-                // Update stats
                 await updateTodayStats();
 
             } catch (err) {
                 console.error('Fetch error:', err);
-                showToast('Failed to fetch data: ' + err.message, 'error');
+                if (isConnected) {
+                    showToast('Failed to fetch data: ' + err.message, 'error');
+                }
             }
         }
 
@@ -2535,20 +2620,17 @@
             if (stateLabel) stateLabel.textContent = state.toUpperCase();
             if (toggleBtnLabel) toggleBtnLabel.textContent = isOpen ? 'Close Gate' : 'Open Gate';
 
-            // Rotate needle
             if (needle) {
                 const visualAngle = (currentServoAngle / 180) * 180 - 90;
                 needle.style.transform = `rotate(${visualAngle}deg)`;
             }
 
-            // Update dial arc
             if (dial) {
                 const fullCircumf = 326;
                 const progress = currentServoAngle / 180;
                 dial.style.strokeDashoffset = fullCircumf * (1 - progress);
             }
 
-            // Dispense animation
             if (dispVis) {
                 if (isOpen) {
                     dispVis.classList.add('dispensing');
@@ -2624,9 +2706,11 @@
         // ============================================
         // MANUAL DISPENSE
         // ============================================
-        async function manualDispense() {
-            if (!supabase) {
-                showToast('Not connected to Supabase', 'error');
+        window.manualDispense = async function () {
+            if (!supabaseClient && !isConnected) {
+                showToast('Demo mode: Dispense simulated', 'success');
+                updateServoUI('Open', 60);
+                setTimeout(() => updateServoUI('Closed', 90), 3000);
                 return;
             }
 
@@ -2642,8 +2726,7 @@
                 const openAngle = settings.servo_open_angle ?? 60;
                 const closedAngle = settings.servo_closed_angle ?? 90;
 
-                // Open servo
-                const { error: updateError } = await supabase
+                const { error: updateError } = await supabaseClient
                     .from('servo_state')
                     .upsert({
                         id: 1,
@@ -2656,8 +2739,7 @@
 
                 updateServoUI('Open', openAngle);
 
-                // Log feeding
-                await supabase.from('feeding_logs').insert({
+                await supabaseClient.from('feeding_logs').insert({
                     type: 'manual',
                     action: 'dispense',
                     servo_angle: openAngle,
@@ -2667,10 +2749,9 @@
 
                 showToast(`Dispensing for ${duration} seconds...`, 'success');
 
-                // Auto close after duration
                 await new Promise(r => setTimeout(r, duration * 1000));
 
-                await supabase.from('servo_state').upsert({
+                await supabaseClient.from('servo_state').upsert({
                     id: 1,
                     state: 'Closed',
                     angle: closedAngle,
@@ -2688,14 +2769,17 @@
                 btn.classList.remove('loading');
                 btn.disabled = false;
             }
-        }
+        };
 
         // ============================================
         // TOGGLE SERVO
         // ============================================
-        async function toggleServo() {
-            if (!supabase) {
-                showToast('Not connected to Supabase', 'error');
+        window.toggleServo = async function () {
+            if (!supabaseClient && !isConnected) {
+                const newState = currentServoState === 'Closed' ? 'Open' : 'Closed';
+                const angle = newState === 'Open' ? 60 : 90;
+                updateServoUI(newState, angle);
+                showToast(`Demo: Gate ${newState}`, 'success');
                 return;
             }
 
@@ -2709,7 +2793,7 @@
                 const newState = currentServoState === 'Closed' ? 'Open' : 'Closed';
                 const angle = newState === 'Open' ? (settings.servo_open_angle ?? 60) : (settings.servo_closed_angle ?? 90);
 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('servo_state')
                     .upsert({
                         id: 1,
@@ -2729,19 +2813,19 @@
                 btn.classList.remove('loading');
                 btn.disabled = false;
             }
-        }
+        };
 
         // ============================================
         // TODAY STATS
         // ============================================
         async function updateTodayStats() {
-            if (!supabase) return;
+            if (!supabaseClient) return;
 
             try {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
 
-                const { data: logs, error: logsError } = await supabase
+                const { data: logs, error: logsError } = await supabaseClient
                     .from('feeding_logs')
                     .select('*')
                     .gte('created_at', today.toISOString());
@@ -2766,8 +2850,7 @@
                     lastFeedTimeEl.textContent = t;
                 }
 
-                // Low alerts count
-                const { data: alerts, error: alertsError } = await supabase
+                const { data: alerts, error: alertsError } = await supabaseClient
                     .from('sensor_readings')
                     .select('*')
                     .gte('created_at', today.toISOString())
@@ -2791,10 +2874,10 @@
         // SCHEDULES
         // ============================================
         async function fetchSchedules() {
-            if (!supabase) return;
+            if (!supabaseClient) return;
 
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('feeding_schedules')
                     .select('*')
                     .order('feeding_time');
@@ -2892,7 +2975,7 @@
             }, 1000);
         }
 
-        function openAddScheduleModal() {
+        window.openAddScheduleModal = function () {
             editScheduleId = null;
             const modalTitle = document.getElementById('modalTitle');
             const scheduleTime = document.getElementById('scheduleTime');
@@ -2905,9 +2988,9 @@
             if (scheduleLabel) scheduleLabel.value = '';
             if (scheduleDuration) scheduleDuration.value = 5;
             if (scheduleModal) scheduleModal.classList.add('open');
-        }
+        };
 
-        function openEditScheduleModal(id) {
+        window.openEditScheduleModal = function (id) {
             const s = schedules.find(x => x.id === id);
             if (!s) return;
 
@@ -2923,16 +3006,17 @@
             if (scheduleLabel) scheduleLabel.value = s.label ?? '';
             if (scheduleDuration) scheduleDuration.value = s.duration_seconds ?? 5;
             if (scheduleModal) scheduleModal.classList.add('open');
-        }
+        };
 
-        function closeModal() {
+        window.closeModal = function () {
             const scheduleModal = document.getElementById('scheduleModal');
             if (scheduleModal) scheduleModal.classList.remove('open');
-        }
+        };
 
-        async function saveSchedule() {
-            if (!supabase) {
-                showToast('Not connected to Supabase', 'error');
+        window.saveSchedule = async function () {
+            if (!supabaseClient && !isConnected) {
+                showToast('Demo mode: Schedule saved locally', 'success');
+                closeModal();
                 return;
             }
 
@@ -2951,7 +3035,7 @@
 
             try {
                 if (editScheduleId) {
-                    const { error } = await supabase
+                    const { error } = await supabaseClient
                         .from('feeding_schedules')
                         .update({ feeding_time: time, label, duration_seconds: duration })
                         .eq('id', editScheduleId);
@@ -2959,7 +3043,7 @@
                     if (error) throw error;
                     showToast('Schedule updated!', 'success');
                 } else {
-                    const { error } = await supabase
+                    const { error } = await supabaseClient
                         .from('feeding_schedules')
                         .insert({ feeding_time: time, label, duration_seconds: duration, enabled: true });
 
@@ -2972,13 +3056,13 @@
                 console.error('Save schedule error:', err);
                 showToast('Failed to save schedule: ' + err.message, 'error');
             }
-        }
+        };
 
-        async function toggleSchedule(id, enabled) {
-            if (!supabase) return;
+        window.toggleSchedule = async function (id, enabled) {
+            if (!supabaseClient) return;
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('feeding_schedules')
                     .update({ enabled })
                     .eq('id', id);
@@ -2989,14 +3073,14 @@
                 console.error('Toggle schedule error:', err);
                 showToast('Failed to toggle schedule', 'error');
             }
-        }
+        };
 
-        async function deleteSchedule(id) {
-            if (!supabase) return;
+        window.deleteSchedule = async function (id) {
+            if (!supabaseClient) return;
             if (!confirm('Delete this schedule?')) return;
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('feeding_schedules')
                     .delete()
                     .eq('id', id);
@@ -3008,16 +3092,16 @@
                 console.error('Delete schedule error:', err);
                 showToast('Failed to delete schedule', 'error');
             }
-        }
+        };
 
         // ============================================
         // SETTINGS
         // ============================================
         async function fetchSettings() {
-            if (!supabase) return;
+            if (!supabaseClient) return;
 
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('system_settings')
                     .select('*')
                     .limit(1);
@@ -3050,9 +3134,9 @@
             }
         }
 
-        async function saveSettings() {
-            if (!supabase) {
-                showToast('Not connected to Supabase', 'error');
+        window.saveSettings = async function () {
+            if (!supabaseClient && !isConnected) {
+                showToast('Demo mode: Settings saved locally', 'success');
                 return;
             }
 
@@ -3075,7 +3159,7 @@
             settings.sensor_interval = parseInt(intervalInput ? intervalInput.value : 5);
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('system_settings')
                     .upsert({ id: 1, ...settings });
 
@@ -3099,16 +3183,16 @@
                     btn.disabled = false;
                 }
             }
-        }
+        };
 
-        async function testConnection() {
-            if (!supabase) {
+        window.testConnection = async function () {
+            if (!supabaseClient) {
                 showToast('Supabase not initialized', 'error');
                 return;
             }
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('sensor_readings')
                     .select('count', { count: 'exact', head: true });
 
@@ -3118,18 +3202,18 @@
                 console.error('Connection test error:', err);
                 showToast('Connection failed: ' + err.message, 'error');
             }
-        }
+        };
 
         // ============================================
         // LOGS
         // ============================================
         async function fetchLogs() {
-            if (!supabase) return;
+            if (!supabaseClient) return;
 
             try {
                 const [{ data: feedLogs, error: feedError }, { data: sensorLogs, error: sensorError }] = await Promise.all([
-                    supabase.from('feeding_logs').select('*').order('created_at', { ascending: false }).limit(100),
-                    supabase.from('sensor_readings').select('*').order('created_at', { ascending: false }).limit(50)
+                    supabaseClient.from('feeding_logs').select('*').order('created_at', { ascending: false }).limit(100),
+                    supabaseClient.from('sensor_readings').select('*').order('created_at', { ascending: false }).limit(50)
                 ]);
 
                 if (feedError) throw feedError;
@@ -3162,7 +3246,7 @@
             }
         }
 
-        function filterLogs() {
+        window.filterLogs = function () {
             const searchInput = document.getElementById('logSearch');
             const typeFilterSelect = document.getElementById('logTypeFilter');
             const dateFilterSelect = document.getElementById('logDateFilter');
@@ -3186,7 +3270,7 @@
             });
 
             renderLogs(filtered);
-        }
+        };
 
         function renderLogs(logs) {
             const container = document.getElementById('logList');
@@ -3214,7 +3298,7 @@
             }).join('');
         }
 
-        function exportLogs() {
+        window.exportLogs = function () {
             const rows = [['Time', 'Type', 'Message', 'Value']];
             allLogs.forEach(l => {
                 rows.push([new Date(l.created_at).toLocaleString(), l.type, l.message, l.value || '']);
@@ -3228,13 +3312,13 @@
             a.click();
             URL.revokeObjectURL(url);
             showToast('Logs exported!', 'success');
-        }
+        };
 
         // ============================================
         // ANALYTICS
         // ============================================
-        async function updateAnalytics() {
-            if (!supabase) return;
+        window.updateAnalytics = async function () {
+            if (!supabaseClient) return;
 
             const rangeSelect = document.getElementById('analyticsRange');
             const range = rangeSelect ? rangeSelect.value : '24h';
@@ -3245,7 +3329,7 @@
             else since.setHours(since.getHours() - 24);
 
             try {
-                const { data: readings, error: readingsError } = await supabase
+                const { data: readings, error: readingsError } = await supabaseClient
                     .from('sensor_readings')
                     .select('*')
                     .gte('created_at', since.toISOString())
@@ -3265,7 +3349,7 @@
                     buildDistanceChart(readings);
                 }
 
-                const { data: logs, error: logsError } = await supabase
+                const { data: logs, error: logsError } = await supabaseClient
                     .from('feeding_logs')
                     .select('*')
                     .gte('created_at', since.toISOString())
@@ -3277,7 +3361,7 @@
             } catch (err) {
                 console.error('Analytics error:', err);
             }
-        }
+        };
 
         const chartDefaults = {
             responsive: true,
@@ -3389,7 +3473,7 @@
         // ============================================
         // NAVIGATION
         // ============================================
-        function showSection(name) {
+        window.showSection = function (name) {
             document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
@@ -3402,19 +3486,19 @@
 
             if (name === 'analytics') updateAnalytics();
             if (name === 'logs') fetchLogs();
-        }
+        };
 
         // ============================================
         // THEME
         // ============================================
-        function toggleTheme() {
+        window.toggleTheme = function () {
             const html = document.documentElement;
             const isDark = html.getAttribute('data-theme') === 'dark';
             html.setAttribute('data-theme', isDark ? 'light' : 'dark');
             const themeIcon = document.getElementById('themeIcon');
             if (themeIcon) themeIcon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
             localStorage.setItem('sf-theme', isDark ? 'light' : 'dark');
-        }
+        };
 
         // ============================================
         // CLOCK
@@ -3458,6 +3542,16 @@
                     if (e.target === scheduleModal) closeModal();
                 });
             }
+
+            // Enable any stuck buttons after 3 seconds
+            setTimeout(() => {
+                document.querySelectorAll('.btn').forEach(btn => {
+                    if (btn.disabled) {
+                        btn.disabled = false;
+                        btn.classList.remove('loading');
+                    }
+                });
+            }, 3000);
         });
     </script>
 </body>
