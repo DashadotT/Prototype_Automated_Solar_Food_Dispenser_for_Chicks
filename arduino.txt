@@ -1,0 +1,672 @@
+// ============================================================
+// solar_feeder.ino — Professional ESP32 Solar Food Dispenser
+// Version: 2.0 | Smart Farming IoT System
+// Hardware: ESP32 + SG90 Servo + HC-SR04 Ultrasonic
+// ============================================================
+// Pins: Servo→GPIO13 | TRIG→GPIO27 | ECHO→GPIO25
+// Servo: 90°=CLOSED | 60°=OPEN
+// Food Alert: distance > threshold cm → LOW FOOD
+// ============================================================
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <ESP32Servo.h>
+#include <time.h>
+
+// ============================================================
+// ⚙️ CONFIGURATION — EDIT THESE
+// ============================================================
+const char* WIFI_SSID = "Octat 2.4G";         // ← Change
+const char* WIFI_PASSWORD = "Sunshine3030z";  // ← Change
+
+const char* SUPABASE_URL = "https://pjmuvnyztjgpbxkxjeti.supabase.co";
+const char* SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqbXV2bnl6dGpncGJ4a3hqZXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MTA5NDAsImV4cCI6MjA5Mzk4Njk0MH0.M07zEn_oLiB2dBdjBeVOnP3EXA5ZTBscs8k7EGNvZVk";
+
+// NTP for schedule timing
+const char* NTP_SERVER = "pool.ntp.org";
+const long GMT_OFFSET = 28800;  // UTC+8 (Philippines) → change for your timezone
+const int DAYLIGHT_OFFSET = 0;
+
+// ============================================================
+// 📌 PIN DEFINITIONS
+// ============================================================
+#define TRIG_PIN 27
+#define ECHO_PIN 25
+#define SERVO_PIN 13
+
+// ============================================================
+// ⚙️ DEFAULT SETTINGS (overridden by Supabase settings)
+// ============================================================
+int SERVO_CLOSED_ANGLE = 90;
+int SERVO_OPEN_ANGLE = 60;
+int DISPENSE_DURATION = 5;       // seconds
+float REFILL_THRESHOLD = 3.0;    // cm
+int SENSOR_INTERVAL = 5000;      // ms
+float EMPTY_DISTANCE_CM = 30.0;  // Max distance when container is empty
+float FULL_DISTANCE_CM = 0.0;    // Min distance when container is full
+
+// ============================================================
+// 📝 FUNCTION PROTOTYPES (forward declarations)
+// ============================================================
+void logEvent(String type, String message, String note = "");
+void logFeedingEvent(String type, int angle, String note);
+void updateServoState(String state, int angle);
+String getISOTime();
+void openGate(int angle);
+void closeGate(int angle);
+void dispenseFood(int duration, int openAngle, int closeAngle, String label);
+void fetchSchedules();
+void processSchedules();
+void sendSensorData(float distance, String foodLevel, int foodPct);
+void updateSystemStatus();
+void fetchSettings();
+float measureDistance();
+float measureDistanceSmoothed();
+String getFoodLevel(float cm);
+int getFoodPercentage(float cm);
+bool fetchServoState();
+void connectWiFi();
+String buildUrl(const char* table, const char* params = "");
+void addSupabaseHeaders(HTTPClient& http);
+int httpPOST(String url, String body);
+int httpPATCH(String url, String body);
+String httpGET(String url);
+
+// ============================================================
+// ⏱️ TIMING (non-blocking millis)
+// ============================================================
+unsigned long lastSensorRead = 0;
+unsigned long lastServoCheck = 0;
+unsigned long lastScheduleCheck = 0;
+unsigned long lastHeartbeat = 0;
+unsigned long lastSettingsFetch = 0;
+unsigned long lastScheduleFetch = 0;
+unsigned long dispenseStartTime = 0;
+unsigned long wifiReconnectTime = 0;
+unsigned long startupTime = 0;
+
+const unsigned long SERVO_CHECK_INTERVAL = 1000;      // 1s — fast response
+const unsigned long SCHEDULE_CHECK_INTERVAL = 30000;  // 30s
+const unsigned long HEARTBEAT_INTERVAL = 15000;       // 15s
+const unsigned long SETTINGS_FETCH_INTERVAL = 60000;  // 1min
+const unsigned long WIFI_RECONNECT_INTERVAL = 5000;   // 5s
+
+// ============================================================
+// 🔘 STATE
+// ============================================================
+Servo foodGateServo;
+float lastDistance = 0.0;
+float distanceBuffer[5];
+int bufferIndex = 0;
+String currentServoState = "Closed";
+bool isDispensing = false;
+bool wifiConnected = false;
+int failedRequests = 0;
+
+// Schedule struct
+struct Schedule {
+  int id;
+  String feeding_time;  // "HH:MM"
+  bool enabled;
+  int duration_seconds;
+  bool triggered_today;
+};
+
+#define MAX_SCHEDULES 10
+Schedule schedules[MAX_SCHEDULES];
+int scheduleCount = 0;
+
+// ============================================================
+// 📡 HTTP HELPERS
+// ============================================================
+String buildUrl(const char* table, const char* params) {
+  return String(SUPABASE_URL) + "/rest/v1/" + table + params;
+}
+
+void addSupabaseHeaders(HTTPClient& http) {
+  http.addHeader("apikey", SUPABASE_ANON_KEY);
+  http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Prefer", "return=minimal");
+  http.setTimeout(8000);
+}
+
+int httpPOST(String url, String body) {
+  if (WiFi.status() != WL_CONNECTED) return -1;
+  HTTPClient http;
+  http.begin(url);
+  addSupabaseHeaders(http);
+  int code = http.POST(body);
+  http.end();
+  return code;
+}
+
+int httpPATCH(String url, String body) {
+  if (WiFi.status() != WL_CONNECTED) return -1;
+  HTTPClient http;
+  http.begin(url);
+  addSupabaseHeaders(http);
+  int code = http.PATCH(body);
+  http.end();
+  return code;
+}
+
+String httpGET(String url) {
+  if (WiFi.status() != WL_CONNECTED) return "";
+  HTTPClient http;
+  http.begin(url);
+  http.addHeader("apikey", SUPABASE_ANON_KEY);
+  http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+  http.setTimeout(8000);
+  int code = http.GET();
+  String response = (code == 200) ? http.getString() : "";
+  http.end();
+  return response;
+}
+
+// ============================================================
+// 📶 WIFI
+// ============================================================
+void connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+
+  Serial.printf("\n📶 Connecting to %s", WIFI_SSID);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiConnected = true;
+    Serial.printf("\n✅ WiFi connected | IP: %s\n", WiFi.localIP().toString().c_str());
+    configTime(GMT_OFFSET, DAYLIGHT_OFFSET, NTP_SERVER);
+    logEvent("system", "WiFi connected", WiFi.localIP().toString());
+  } else {
+    wifiConnected = false;
+    Serial.println("\n❌ WiFi failed — will retry");
+  }
+}
+
+// ============================================================
+// 📏 ULTRASONIC SENSOR
+// ============================================================
+float measureDistance() {
+  // Trigger pulse
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+  if (duration == 0) return -1.0;
+
+  return duration * 0.034f / 2.0f;
+}
+
+// Smoothed reading using median filter
+float measureDistanceSmoothed() {
+  // Take 5 readings
+  float readings[5];
+  for (int i = 0; i < 5; i++) {
+    readings[i] = measureDistance();
+    delay(10);
+  }
+
+  // Sort (bubble)
+  for (int i = 0; i < 4; i++) {
+    for (int j = i + 1; j < 5; j++) {
+      if (readings[j] < readings[i]) {
+        float tmp = readings[i];
+        readings[i] = readings[j];
+        readings[j] = tmp;
+      }
+    }
+  }
+
+  // Return median
+  float median = readings[2];
+  if (median < 0 || median > 400) return -1.0;
+  return median;
+}
+
+String getFoodLevel(float cm) {
+  if (cm < 0) return "Unknown";
+
+  // Calculate percentage based on empty/full distances
+  float range = EMPTY_DISTANCE_CM - FULL_DISTANCE_CM;
+  if (range <= 0) range = 30.0;  // fallback
+
+  float pct = ((EMPTY_DISTANCE_CM - cm) / range) * 100.0f;
+  pct = constrain(pct, 0, 100);
+
+  if (pct >= 85) return "Full";
+  if (pct >= 50) return "Medium";
+  if (pct >= 15) return "Low";
+  return "Empty";
+}
+
+int getFoodPercentage(float cm) {
+  if (cm < 0) return 0;
+
+  // Use dynamic empty/full distances
+  float maxCm = EMPTY_DISTANCE_CM;
+  float minCm = FULL_DISTANCE_CM;
+
+  // Clamp the distance between min and max
+  float clampedCm = constrain(cm, minCm, maxCm);
+
+  // Calculate percentage: 100% when distance = min (full), 0% when distance = max (empty)
+  int pct = (int)(((maxCm - clampedCm) / (maxCm - minCm)) * 100.0f);
+  return constrain(pct, 0, 100);
+}
+
+// ============================================================
+// 📤 SEND SENSOR DATA
+// ============================================================
+void sendSensorData(float distance, String foodLevel, int foodPct) {
+  StaticJsonDocument<256> doc;
+  doc["distance_cm"] = round(distance * 10) / 10.0;
+  doc["food_level"] = foodLevel;
+  doc["food_percentage"] = foodPct;
+
+  String body;
+  serializeJson(doc, body);
+
+  int code = httpPOST(buildUrl("sensor_readings", ""), body);
+  if (code == 201 || code == 200) {
+    Serial.printf("✅ Sensor sent: %.1fcm | %s | %d%%\n", distance, foodLevel.c_str(), foodPct);
+    failedRequests = 0;
+  } else {
+    Serial.printf("❌ Sensor send failed: %d\n", code);
+    failedRequests++;
+  }
+}
+
+// ============================================================
+// 🔄 FETCH SERVO STATE
+// ============================================================
+bool fetchServoState() {
+  String response = httpGET(buildUrl("servo_state", "?select=state,angle&limit=1"));
+  if (response.isEmpty()) return false;
+
+  StaticJsonDocument<128> doc;
+  if (deserializeJson(doc, response) != DeserializationError::Ok) return false;
+  if (!doc[0]["state"].is<const char*>()) return false;
+
+  String newState = doc[0]["state"].as<String>();
+  int angle = doc[0]["angle"] | -1;
+
+  if (newState != currentServoState) {
+    currentServoState = newState;
+    if (newState == "Open" && !isDispensing) {
+      // Manual open from dashboard
+      openGate(angle > 0 ? angle : SERVO_OPEN_ANGLE);
+    } else if (newState == "Closed") {
+      closeGate(angle > 0 ? angle : SERVO_CLOSED_ANGLE);
+    }
+    Serial.printf("🔄 Servo → %s\n", newState.c_str());
+    return true;
+  }
+  return false;
+}
+
+// ============================================================
+// 🍽️ SERVO CONTROL
+// ============================================================
+void openGate(int angle) {
+  foodGateServo.write(angle);
+  Serial.printf("🔓 Gate OPEN → %d°\n", angle);
+}
+
+void closeGate(int angle) {
+  foodGateServo.write(angle);
+  Serial.printf("🔒 Gate CLOSED → %d°\n", angle);
+}
+
+void dispenseFood(int duration, int openAngle, int closeAngle, String label) {
+  if (isDispensing) {
+    Serial.println("⚠️ Already dispensing");
+    return;
+  }
+
+  isDispensing = true;
+  Serial.printf("🍽️ Dispensing: %s (%ds)\n", label.c_str(), duration);
+
+  // Open servo
+  openGate(openAngle);
+  currentServoState = "Open";
+  updateServoState("Open", openAngle);
+
+  // Log feeding start
+  logFeedingEvent("automatic", openAngle, label);
+
+  // Wait (blocking OK here, gate must stay open)
+  delay(duration * 1000);
+
+  // Close servo
+  closeGate(closeAngle);
+  currentServoState = "Closed";
+  updateServoState("Closed", closeAngle);
+
+  isDispensing = false;
+  Serial.println("✅ Dispense complete");
+}
+
+// ============================================================
+// 📊 UPDATE SERVO STATE IN SUPABASE
+// ============================================================
+void updateServoState(String state, int angle) {
+  StaticJsonDocument<128> doc;
+  doc["state"] = state;
+  doc["angle"] = angle;
+  doc["updated_at"] = getISOTime();
+
+  String body;
+  serializeJson(doc, body);
+  httpPATCH(buildUrl("servo_state", "?id=eq.1"), body);
+}
+
+// ============================================================
+// 📅 FETCH SCHEDULES
+// ============================================================
+void fetchSchedules() {
+  String response = httpGET(buildUrl("feeding_schedules", "?select=id,feeding_time,enabled,duration_seconds&order=feeding_time"));
+  if (response.isEmpty()) return;
+
+  StaticJsonDocument<1024> doc;
+  if (deserializeJson(doc, response) != DeserializationError::Ok) return;
+
+  scheduleCount = 0;
+  for (JsonObject s : doc.as<JsonArray>()) {
+    if (scheduleCount >= MAX_SCHEDULES) break;
+    schedules[scheduleCount].id = s["id"] | 0;
+    schedules[scheduleCount].feeding_time = s["feeding_time"].as<String>().substring(0, 5);
+    schedules[scheduleCount].enabled = s["enabled"] | false;
+    schedules[scheduleCount].duration_seconds = s["duration_seconds"] | DISPENSE_DURATION;
+    schedules[scheduleCount].triggered_today = false;
+    scheduleCount++;
+  }
+  Serial.printf("📅 Loaded %d schedules\n", scheduleCount);
+}
+
+// ============================================================
+// ✅ PROCESS SCHEDULES
+// ============================================================
+void processSchedules() {
+  struct tm timeInfo;
+  if (!getLocalTime(&timeInfo)) return;
+
+  char currentTime[6];
+  snprintf(currentTime, sizeof(currentTime), "%02d:%02d", timeInfo.tm_hour, timeInfo.tm_min);
+
+  // Reset triggers at midnight
+  if (timeInfo.tm_hour == 0 && timeInfo.tm_min == 0 && timeInfo.tm_sec < 30) {
+    for (int i = 0; i < scheduleCount; i++) {
+      schedules[i].triggered_today = false;
+    }
+  }
+
+  for (int i = 0; i < scheduleCount; i++) {
+    if (!schedules[i].enabled) continue;
+    if (schedules[i].triggered_today) continue;
+    if (schedules[i].feeding_time == String(currentTime)) {
+      schedules[i].triggered_today = true;
+      Serial.printf("⏰ Schedule triggered: %s\n", schedules[i].feeding_time.c_str());
+      dispenseFood(schedules[i].duration_seconds, SERVO_OPEN_ANGLE, SERVO_CLOSED_ANGLE,
+                   "Schedule " + schedules[i].feeding_time);
+    }
+  }
+}
+
+// ============================================================
+// 📝 LOGGING
+// ============================================================
+void logFeedingEvent(String type, int angle, String note) {
+  StaticJsonDocument<256> doc;
+  doc["type"] = type;
+  doc["action"] = "dispense";
+  doc["servo_angle"] = angle;
+  doc["note"] = note;
+  doc["created_at"] = getISOTime();
+
+  String body;
+  serializeJson(doc, body);
+  int code = httpPOST(buildUrl("feeding_logs", ""), body);
+  Serial.printf("📝 Feed log: %s → %d\n", note.c_str(), code);
+}
+
+void logEvent(String type, String message, String note) {
+  StaticJsonDocument<256> doc;
+  doc["type"] = type;
+  doc["action"] = message;
+  doc["note"] = note;
+  doc["created_at"] = getISOTime();
+
+  String body;
+  serializeJson(doc, body);
+  httpPOST(buildUrl("feeding_logs", ""), body);
+}
+
+// ============================================================
+// ❤️ HEARTBEAT — System Status
+// ============================================================
+void updateSystemStatus() {
+  unsigned long uptime = (millis() - startupTime) / 1000;
+  String ip = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "disconnected";
+
+  StaticJsonDocument<256> doc;
+  doc["id"] = 1;
+  doc["esp32_online"] = true;
+  doc["wifi_status"] = ip;
+  doc["uptime_seconds"] = (int)uptime;
+  doc["last_seen"] = getISOTime();
+
+  String body;
+  serializeJson(doc, body);
+
+  HTTPClient http;
+  http.begin(buildUrl("system_status", "?id=eq.1"));
+  addSupabaseHeaders(http);
+  int code = http.PATCH(body);
+
+  if (code == 404 || code == 0) {
+    // Row doesn't exist, insert it
+    http.end();
+    http.begin(buildUrl("system_status", ""));
+    addSupabaseHeaders(http);
+    http.POST(body);
+  }
+
+  http.end();
+  Serial.printf("❤️ Heartbeat | Uptime: %lus | WiFi: %s\n", uptime, ip.c_str());
+}
+
+// ============================================================
+// ⚙️ FETCH SETTINGS
+// ============================================================
+void fetchSettings() {
+  String response = httpGET(buildUrl("system_settings", "?limit=1"));
+  if (response.isEmpty()) return;
+
+  StaticJsonDocument<512> doc;  // Increased size for more settings
+  if (deserializeJson(doc, response) != DeserializationError::Ok) return;
+  if (!doc[0].is<JsonObject>()) return;
+
+  JsonObject s = doc[0];
+  SERVO_OPEN_ANGLE = s["servo_open_angle"] | SERVO_OPEN_ANGLE;
+  SERVO_CLOSED_ANGLE = s["servo_closed_angle"] | SERVO_CLOSED_ANGLE;
+  DISPENSE_DURATION = s["dispense_duration"] | DISPENSE_DURATION;
+  REFILL_THRESHOLD = s["refill_threshold_cm"] | REFILL_THRESHOLD;
+  SENSOR_INTERVAL = (s["sensor_interval"] | 5) * 1000;
+
+  // NEW: Load empty/full distance settings
+  EMPTY_DISTANCE_CM = s["empty_distance_cm"] | EMPTY_DISTANCE_CM;
+  FULL_DISTANCE_CM = s["full_distance_cm"] | FULL_DISTANCE_CM;
+
+  // Validate settings - ensure empty > full
+  if (EMPTY_DISTANCE_CM <= FULL_DISTANCE_CM) {
+    EMPTY_DISTANCE_CM = 30.0;
+    FULL_DISTANCE_CM = 0.0;
+    Serial.println("⚠️ Invalid distance settings, using defaults");
+  }
+
+  Serial.printf("⚙️ Settings: Open=%d° Closed=%d° Duration=%ds Threshold=%.1fcm Empty=%.1fcm Full=%.1fcm\n",
+                SERVO_OPEN_ANGLE, SERVO_CLOSED_ANGLE, DISPENSE_DURATION,
+                REFILL_THRESHOLD, EMPTY_DISTANCE_CM, FULL_DISTANCE_CM);
+}
+
+// ============================================================
+// 🕐 ISO TIME HELPER
+// ============================================================
+String getISOTime() {
+  struct tm timeInfo;
+  if (!getLocalTime(&timeInfo)) return "1970-01-01T00:00:00Z";
+  char buf[30];
+  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeInfo);
+  return String(buf);
+}
+
+// ============================================================
+// ✅ SETUP
+// ============================================================
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+
+  Serial.println("\n");
+  Serial.println("╔══════════════════════════════════════╗");
+  Serial.println("║  🌱 SolarFeed IoT v2.0               ║");
+  Serial.println("║  Solar-Powered Smart Food Dispenser  ║");
+  Serial.println("╚══════════════════════════════════════╝");
+
+  // Pin setup
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  digitalWrite(TRIG_PIN, LOW);
+
+  // Servo init
+  foodGateServo.attach(SERVO_PIN, 500, 2400);
+  foodGateServo.write(SERVO_CLOSED_ANGLE);
+  Serial.printf("🔒 Servo initialized: %d° (closed)\n", SERVO_CLOSED_ANGLE);
+
+  startupTime = millis();
+
+  // WiFi
+  connectWiFi();
+  delay(1000);
+
+  if (WiFi.status() == WL_CONNECTED) {
+    // Fetch settings first
+    fetchSettings();
+    delay(500);
+
+    // Fetch schedules
+    fetchSchedules();
+    delay(500);
+
+    // Initial sensor read
+    float d = measureDistanceSmoothed();
+    if (d > 0 && d < 400) {
+      lastDistance = d;
+      sendSensorData(d, getFoodLevel(d), getFoodPercentage(d));
+    }
+
+    // Initial status update
+    updateSystemStatus();
+    delay(500);
+
+    // Get current servo state
+    fetchServoState();
+
+    logEvent("system", "ESP32 started", "v2.0 boot complete");
+  }
+
+  Serial.println("✅ Setup complete — entering main loop");
+  Serial.printf("   Sensor every: %dms\n", SENSOR_INTERVAL);
+  Serial.printf("   Servo check:  %dms\n", (int)SERVO_CHECK_INTERVAL);
+  Serial.printf("   Heartbeat:    %dms\n", (int)HEARTBEAT_INTERVAL);
+}
+
+// ============================================================
+// 🔄 MAIN LOOP
+// ============================================================
+void loop() {
+  unsigned long now = millis();
+
+  // ── WiFi reconnect ──────────────────────────────────────
+  if (WiFi.status() != WL_CONNECTED) {
+    if (now - wifiReconnectTime >= WIFI_RECONNECT_INTERVAL) {
+      wifiReconnectTime = now;
+      wifiConnected = false;
+      Serial.println("📶 WiFi lost — reconnecting...");
+      connectWiFi();
+    }
+    delay(100);
+    return;  // Skip everything else until WiFi is back
+  }
+
+  // ── Sensor reading ──────────────────────────────────────
+  if (now - lastSensorRead >= (unsigned long)SENSOR_INTERVAL) {
+    lastSensorRead = now;
+
+    float distance = measureDistanceSmoothed();
+    if (distance > 0 && distance < 400) {
+      lastDistance = distance;
+      String level = getFoodLevel(distance);
+      int pct = getFoodPercentage(distance);
+
+      sendSensorData(distance, level, pct);
+
+      // Low food alert
+      if (distance > REFILL_THRESHOLD) {
+        Serial.printf("⚠️ LOW FOOD! %.1fcm > %.1fcm threshold\n", distance, REFILL_THRESHOLD);
+      }
+
+      Serial.printf("📏 Distance: %.1fcm | %s | %d%%\n", distance, level.c_str(), pct);
+    } else {
+      Serial.println("⚠️ Invalid sensor reading");
+    }
+  }
+
+  // ── Servo state check (fast — every 1s) ─────────────────
+  if (!isDispensing && now - lastServoCheck >= SERVO_CHECK_INTERVAL) {
+    lastServoCheck = now;
+    fetchServoState();
+  }
+
+  // ── Schedule processing ──────────────────────────────────
+  if (now - lastScheduleCheck >= 10000) {  // every 10s
+    lastScheduleCheck = now;
+    processSchedules();
+  }
+
+  // ── Refresh schedules from Supabase ─────────────────────
+  if (now - lastScheduleFetch >= SCHEDULE_CHECK_INTERVAL) {
+    lastScheduleFetch = now;
+    fetchSchedules();
+  }
+
+  // ── Settings refresh ─────────────────────────────────────
+  if (now - lastSettingsFetch >= SETTINGS_FETCH_INTERVAL) {
+    lastSettingsFetch = now;
+    fetchSettings();
+  }
+
+  // ── Heartbeat ────────────────────────────────────────────
+  if (now - lastHeartbeat >= HEARTBEAT_INTERVAL) {
+    lastHeartbeat = now;
+    updateSystemStatus();
+  }
+
+  delay(50);
+}
+
+
+This is version 2

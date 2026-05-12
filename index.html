@@ -1,563 +1,3615 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>SolarFeed IoT | Smart Food Dispenser Dashboard</title>
-    <!-- Supabase JS library for realtime & interactions -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a1a0f">
+    <meta name="description" content="SolarFeed IoT - Smart Solar Food Dispenser Dashboard for Chicks">
+    <title>SolarFeed IoT | Smart Dispenser Dashboard</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Font Awesome 6 (free icons) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-        * {
+        /* =============================================
+   CSS VARIABLES & RESET
+   ============================================= */
+        :root {
+            --bg-primary: #0a1a0f;
+            --bg-secondary: #0f2218;
+            --bg-card: #112a1a;
+            --bg-card-hover: #163420;
+            --bg-glass: rgba(17, 42, 26, 0.85);
+            --border: rgba(52, 168, 83, 0.15);
+            --border-bright: rgba(52, 168, 83, 0.35);
+            --accent: #34a853;
+            --accent-bright: #4ccc6e;
+            --accent-dim: rgba(52, 168, 83, 0.12);
+            --accent-glow: rgba(52, 168, 83, 0.25);
+            --text-primary: #e8f5e9;
+            --text-secondary: #a5c8a9;
+            --text-muted: #5a8a62;
+            --text-dim: #3a6040;
+            --warning: #f4b942;
+            --warning-bg: rgba(244, 185, 66, 0.1);
+            --danger: #ef5350;
+            --danger-bg: rgba(239, 83, 80, 0.1);
+            --info: #42a5f5;
+            --info-bg: rgba(66, 165, 245, 0.1);
+            --success: #66bb6a;
+            --success-bg: rgba(102, 187, 106, 0.1);
+            --radius-sm: 8px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+            --radius-xl: 32px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.6);
+            --font-body: 'Space Grotesk', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #f0f7f1;
+            --bg-secondary: #e3f0e4;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f5fbf5;
+            --bg-glass: rgba(255, 255, 255, 0.9);
+            --border: rgba(52, 168, 83, 0.2);
+            --border-bright: rgba(52, 168, 83, 0.45);
+            --accent: #2e7d32;
+            --accent-bright: #34a853;
+            --accent-dim: rgba(46, 125, 50, 0.08);
+            --accent-glow: rgba(46, 125, 50, 0.15);
+            --text-primary: #1a3d1e;
+            --text-secondary: #2e6e34;
+            --text-muted: #5a8a62;
+            --text-dim: #8caa90;
+            --shadow: 0 4px 24px rgba(0, 50, 0, 0.12);
+            --shadow-lg: 0 8px 48px rgba(0, 50, 0, 0.18);
+        }
+
+        *,
+        *::before,
+        *::after {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        html {
+            scroll-behavior: smooth;
         }
 
         body {
-            background: linear-gradient(145deg, #e9f5e9 0%, #c8e6c9 100%);
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
-            padding: 2rem 1.5rem;
+            line-height: 1.6;
+            transition: background 0.3s, color 0.3s;
+            overflow-x: hidden;
         }
 
-        .dashboard-container {
-            max-width: 1300px;
-            margin: 0 auto;
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 20% 0%, rgba(52, 168, 83, 0.06) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 80% 100%, rgba(52, 168, 83, 0.04) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
         }
 
-        .header {
-            margin-bottom: 2rem;
-            text-align: center;
+        /* =============================================
+   SCROLLBAR
+   ============================================= */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
         }
 
-        .header h1 {
-            font-size: 2.2rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #1e3c2c, #2b6e3c);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            letter-spacing: -0.3px;
-            display: inline-flex;
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-bright);
+            border-radius: 3px;
+        }
+
+        /* =============================================
+   LAYOUT
+   ============================================= */
+        .app-layout {
+            display: flex;
+            min-height: 100vh;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* =============================================
+   SIDEBAR NAV
+   ============================================= */
+        .sidebar {
+            width: 72px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 12px;
+            padding: 1.5rem 0;
+            gap: 0.5rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 100;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .header h1 i {
-            background: none;
-            -webkit-background-clip: unset;
-            background-clip: unset;
-            color: #2e7d32;
-            font-size: 2rem;
+        .sidebar-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-bright));
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: white;
+            margin-bottom: 1rem;
+            flex-shrink: 0;
         }
 
-        .sub {
-            color: #2c5e2e;
-            margin-top: 6px;
-            opacity: 0.8;
+        .nav-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            width: 100%;
+            padding: 0 12px;
+        }
+
+        .nav-divider {
+            width: 32px;
+            height: 1px;
+            background: var(--border);
+            margin: 8px auto;
+        }
+
+        .nav-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            text-decoration: none;
+        }
+
+        .nav-btn:hover,
+        .nav-btn.active {
+            background: var(--accent-dim);
+            color: var(--accent-bright);
+        }
+
+        .nav-btn.active::before {
+            content: '';
+            position: absolute;
+            left: -12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 24px;
+            background: var(--accent);
+            border-radius: 0 2px 2px 0;
+        }
+
+        .nav-btn .tooltip {
+            position: absolute;
+            left: calc(100% + 12px);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
             font-weight: 500;
+            white-space: nowrap;
+            border: 1px solid var(--border);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 200;
         }
 
-        .cards-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.8rem;
-            margin-bottom: 2rem;
+        .nav-btn:hover .tooltip {
+            opacity: 1;
         }
 
+        .sidebar-bottom {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 0 12px;
+        }
+
+        /* =============================================
+   MAIN CONTENT
+   ============================================= */
+        .main-content {
+            margin-left: 72px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        /* =============================================
+   TOP NAVBAR
+   ============================================= */
+        .topbar {
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 1.5rem;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .topbar-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+
+        .topbar-title span {
+            color: var(--accent);
+        }
+
+        .topbar-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            transition: var(--transition);
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .status-dot.online {
+            background: var(--success);
+            box-shadow: 0 0 6px var(--success);
+            animation: pulse-dot 2s infinite;
+        }
+
+        .status-dot.warning {
+            background: var(--warning);
+        }
+
+        .status-dot.offline {
+            background: var(--danger);
+        }
+
+        @keyframes pulse-dot {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .datetime-display {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .theme-toggle {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        /* =============================================
+   PAGE SECTIONS
+   ============================================= */
+        .page-section {
+            display: none;
+            padding: 1.5rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .page-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+
+        .section-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* =============================================
+   CARDS
+   ============================================= */
         .card {
-            background: rgba(255, 255, 255, 0.94);
-            backdrop-filter: blur(0px);
-            border-radius: 32px;
-            box-shadow: 0 15px 35px rgba(0, 32, 0, 0.1);
-            padding: 1.5rem 1.2rem;
-            transition: transform 0.2s ease, box-shadow 0.2s;
-            border: 1px solid rgba(70, 130, 70, 0.2);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--accent-dim) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .card:hover::before {
+            opacity: 1;
         }
 
         .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 25px 40px rgba(40, 90, 30, 0.15);
+            border-color: var(--border-bright);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
         }
 
         .card-header {
             display: flex;
             align-items: center;
             gap: 10px;
-            border-bottom: 2px solid #d0e6cf;
-            padding-bottom: 0.8rem;
-            margin-bottom: 1.2rem;
+            margin-bottom: 1.25rem;
         }
 
-        .card-header i {
-            font-size: 1.8rem;
-            color: #2b6e3c;
-        }
-
-        .card-header h3 {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: #1a3b2a;
-        }
-
-        .status-value {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin: 0.6rem 0 0.2rem;
-        }
-
-        .distance-cm {
-            font-size: 2rem;
-            font-weight: 700;
-        }
-
-        .unit {
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            background: var(--accent-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
             font-size: 1rem;
-            font-weight: normal;
-            color: #4a6741;
+            flex-shrink: 0;
         }
 
-        .level-badge {
-            display: inline-block;
-            padding: 0.3rem 1rem;
-            border-radius: 60px;
+        .card-title {
+            font-size: 0.9rem;
             font-weight: 600;
-            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        /* =============================================
+   STAT CARDS GRID
+   ============================================= */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-value {
+            font-size: 2.8rem;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: -1px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+        }
+
+        .stat-unit {
+            font-size: 1rem;
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-left: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
             margin-top: 0.5rem;
-        }
-
-        .warning-text {
-            color: #b91c1c;
-            background: #ffe5e5;
-            border-radius: 24px;
-            padding: 6px 12px;
-            font-weight: 600;
-            font-size: 0.85rem;
-            display: inline-flex;
+            display: flex;
             align-items: center;
             gap: 6px;
         }
 
-        .servo-btn {
-            background: #2e7d32;
+        /* =============================================
+   FOOD LEVEL PROGRESS
+   ============================================= */
+        .food-level-card {
+            grid-column: span 2;
+        }
+
+        @media (max-width: 768px) {
+            .food-level-card {
+                grid-column: span 1;
+            }
+        }
+
+        .progress-track {
+            height: 12px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 100px;
+            overflow: hidden;
+            margin: 1rem 0 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 100px;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1), background 0.5s;
+            background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 40px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25));
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+        .progress-fill.low {
+            background: linear-gradient(90deg, var(--warning), #ffb74d);
+        }
+
+        .progress-fill.critical {
+            background: linear-gradient(90deg, var(--danger), #ef5350);
+            animation: pulse-bar 1s infinite;
+        }
+
+        @keyframes pulse-bar {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .level-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 14px;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .level-badge.full {
+            background: var(--success-bg);
+            color: var(--success);
+            border: 1px solid rgba(102, 187, 106, 0.3);
+        }
+
+        .level-badge.medium {
+            background: var(--info-bg);
+            color: var(--info);
+            border: 1px solid rgba(66, 165, 245, 0.3);
+        }
+
+        .level-badge.low {
+            background: var(--warning-bg);
+            color: var(--warning);
+            border: 1px solid rgba(244, 185, 66, 0.3);
+        }
+
+        .level-badge.empty {
+            background: var(--danger-bg);
+            color: var(--danger);
+            border: 1px solid rgba(239, 83, 80, 0.3);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        .refill-alert {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--danger-bg);
+            border: 1px solid rgba(239, 83, 80, 0.3);
+            border-radius: var(--radius-md);
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: var(--danger);
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+        }
+
+        .refill-alert.show {
+            display: flex;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* =============================================
+   SERVO CONTROL
+   ============================================= */
+        .servo-visual {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.5rem 0;
+        }
+
+        .servo-dial {
+            width: 120px;
+            height: 120px;
+            position: relative;
+        }
+
+        .servo-dial svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .servo-angle-display {
+            font-family: var(--font-mono);
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-align: center;
+        }
+
+        .servo-state-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            font-weight: 600;
             border: none;
-            padding: 12px 20px;
-            border-radius: 40px;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--accent);
             color: white;
-            font-weight: bold;
-            font-size: 1rem;
+            box-shadow: 0 4px 16px var(--accent-glow);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-bright);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px var(--accent-glow);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--accent);
+            border: 1px solid var(--border-bright);
+        }
+
+        .btn-outline:hover {
+            background: var(--accent-dim);
+        }
+
+        .btn-danger {
+            background: var(--danger-bg);
+            color: var(--danger);
+            border: 1px solid rgba(239, 83, 80, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 83, 80, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: none;
+        }
+
+        .btn.loading .spinner {
+            display: block;
+        }
+
+        .btn.loading .btn-icon {
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        /* =============================================
+   SCHEDULE SECTION
+   ============================================= */
+        .schedule-grid {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .schedule-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: var(--transition);
+        }
+
+        .schedule-card:hover {
+            border-color: var(--border-bright);
+        }
+
+        .schedule-time {
+            font-family: var(--font-mono);
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            min-width: 80px;
+        }
+
+        .schedule-info {
+            flex: 1;
+        }
+
+        .schedule-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .schedule-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 100px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch input:checked+.toggle-track {
+            background: var(--accent);
+        }
+
+        .toggle-track::after {
+            content: '';
+            position: absolute;
+            left: 3px;
+            top: 3px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .toggle-switch input:checked+.toggle-track::after {
+            transform: translateX(20px);
+        }
+
+        .schedule-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .icon-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            width: 100%;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-top: 1rem;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            font-size: 0.85rem;
+            transition: var(--transition);
         }
 
-        .servo-btn.open {
-            background: #1f5e2a;
+        .icon-btn:hover {
+            background: var(--accent-dim);
+            color: var(--accent);
+            border-color: var(--border-bright);
         }
 
-        .servo-btn.closed {
-            background: #b45309;
+        .icon-btn.danger:hover {
+            background: var(--danger-bg);
+            color: var(--danger);
+            border-color: rgba(239, 83, 80, 0.3);
         }
 
-        .servo-btn:hover {
-            filter: brightness(1.05);
-            transform: scale(0.98);
-        }
-
-        .status-badge {
-            font-weight: 600;
-            font-size: 1.2rem;
-            padding: 0.4rem 0;
-        }
-
-        .timestamp {
-            font-size: 0.8rem;
-            color: #4e6e3e;
-            background: #edf7e6;
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 30px;
-            margin-top: 12px;
-        }
-
-        .history-section {
-            background: white;
-            border-radius: 32px;
-            padding: 1.6rem;
-            box-shadow: 0 12px 28px rgba(0, 20, 0, 0.08);
-            margin-top: 1rem;
-        }
-
-        .history-section h3 {
-            display: flex;
-            gap: 10px;
+        .countdown-badge {
+            display: inline-flex;
             align-items: center;
-            font-size: 1.4rem;
-            color: #1f4f2b;
-            margin-bottom: 1rem;
+            gap: 5px;
+            padding: 3px 10px;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: var(--font-mono);
         }
 
-        .history-log {
-            max-height: 280px;
+        /* =============================================
+   ANALYTICS
+   ============================================= */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .analytics-metric {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.25rem;
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .analytics-metric:hover {
+            border-color: var(--border-bright);
+        }
+
+        .metric-number {
+            font-family: var(--font-mono);
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-bright);
+            line-height: 1;
+        }
+
+        .metric-label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 220px;
+        }
+
+        /* =============================================
+   LOGS SECTION
+   ============================================= */
+        .log-controls {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 8px 14px 8px 36px;
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            outline: none;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent);
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-wrapper i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .filter-select {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 8px 14px;
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            outline: none;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .filter-select:focus {
+            border-color: var(--accent);
+        }
+
+        .log-list {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            max-height: 500px;
             overflow-y: auto;
-            border-radius: 24px;
-            background: #f9fff7;
         }
 
         .log-entry {
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: 100px 1fr auto auto;
             align-items: center;
+            gap: 1rem;
             padding: 12px 16px;
-            border-bottom: 1px solid #ddecdb;
-            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+            transition: background 0.2s;
         }
 
-        .log-entry span:first-child {
-            font-family: monospace;
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry:hover {
+            background: var(--accent-dim);
+        }
+
+        .log-time {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .log-message {
+            color: var(--text-secondary);
+        }
+
+        .log-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 100px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .log-badge.manual {
+            background: var(--info-bg);
+            color: var(--info);
+        }
+
+        .log-badge.auto {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .log-badge.sensor {
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        .log-badge.alert {
+            background: var(--warning-bg);
+            color: var(--warning);
+        }
+
+        .log-badge.error {
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
+
+        .log-badge.system {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-muted);
+        }
+
+        .log-badge.wifi {
+            background: var(--info-bg);
+            color: var(--info);
+        }
+
+        .log-value {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--accent);
+        }
+
+        .empty-state {
+            padding: 3rem;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 2.5rem;
+            opacity: 0.3;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        /* =============================================
+   SETTINGS
+   ============================================= */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .settings-group {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+        }
+
+        .settings-group-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+            gap: 1rem;
+        }
+
+        .setting-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .setting-label {
+            font-size: 0.9rem;
+            color: var(--text-primary);
             font-weight: 500;
         }
 
-        .log-level {
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 40px;
-            background: #eaf7e4;
+        .setting-desc {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 2px;
         }
 
-        .emergency {
-            background: #ffefef;
-            border-left: 4px solid #e3342f;
+        .setting-input {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 6px 12px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            width: 90px;
+            text-align: right;
+            outline: none;
+            transition: var(--transition);
         }
 
-        .empty-warning {
-            background: #ffdddd;
-            border-left: 4px solid red;
+        .setting-input:focus {
+            border-color: var(--accent);
         }
 
-        footer {
-            text-align: center;
-            margin-top: 2rem;
-            font-size: 0.75rem;
-            color: #3c6e3a;
-        }
-
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .flex-row {
+        /* =============================================
+   MODAL
+   ============================================= */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
             display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            width: 100%;
+            max-width: 480px;
+            transform: scale(0.95) translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .modal-overlay.open .modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
             justify-content: space-between;
-            align-items: baseline;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
+
+        .form-field {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .form-input {
+            width: 100%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .form-input:focus {
+            border-color: var(--accent);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        /* =============================================
+   TOAST
+   ============================================= */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 1.5rem;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 18px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            box-shadow: var(--shadow);
+            animation: toastIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            min-width: 280px;
+            max-width: 400px;
+        }
+
+        .toast.success {
+            border-color: rgba(102, 187, 106, 0.4);
+        }
+
+        .toast.error {
+            border-color: rgba(239, 83, 80, 0.4);
+        }
+
+        .toast.warning {
+            border-color: rgba(244, 185, 66, 0.4);
+        }
+
+        .toast-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .toast.success .toast-icon {
+            color: var(--success);
+        }
+
+        .toast.error .toast-icon {
+            color: var(--danger);
+        }
+
+        .toast.warning .toast-icon {
+            color: var(--warning);
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes toastOut {
+            to {
+                opacity: 0;
+                transform: translateX(120%);
+            }
+        }
+
+        /* =============================================
+   SKELETON LOADING
+   ============================================= */
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+            border-radius: var(--radius-sm);
+        }
+
+        @keyframes skeleton-shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* =============================================
+   REALTIME PULSE
+   ============================================= */
+        .realtime-pulse {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .pulse-ring {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            position: relative;
+        }
+
+        .pulse-ring::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 1px solid var(--success);
+            animation: ping 1.5s ease-out infinite;
+        }
+
+        @keyframes ping {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(2.2);
+                opacity: 0;
+            }
+        }
+
+        /* =============================================
+   NEXT FEEDING COUNTDOWN
+   ============================================= */
+        .next-feeding-banner {
+            background: var(--accent-dim);
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
             flex-wrap: wrap;
+        }
+
+        .next-feeding-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .next-feeding-time {
+            font-family: var(--font-mono);
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-bright);
+        }
+
+        .countdown-timer {
+            margin-left: auto;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            padding: 6px 14px;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+        }
+
+        /* =============================================
+   DASHBOARD HOME GRID
+   ============================================= */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1rem;
+        }
+
+        .dashboard-grid-full {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* =============================================
+   RESPONSIVE
+   ============================================= */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: 60px;
+                flex-direction: row;
+                bottom: 0;
+                top: auto;
+                border-right: none;
+                border-top: 1px solid var(--border);
+                padding: 0 1rem;
+                justify-content: space-around;
+            }
+
+            .sidebar-logo {
+                display: none;
+            }
+
+            .nav-group {
+                flex-direction: row;
+                padding: 0;
+                width: auto;
+            }
+
+            .nav-divider {
+                display: none;
+            }
+
+            .sidebar-bottom {
+                flex-direction: row;
+                margin-top: 0;
+                padding: 0;
+            }
+
+            .main-content {
+                margin-left: 0;
+                margin-bottom: 60px;
+            }
+
+            .nav-btn .tooltip {
+                display: none;
+            }
+
+            .nav-btn.active::before {
+                left: 50%;
+                top: -8px;
+                transform: translateX(-50%);
+                width: 24px;
+                height: 3px;
+                border-radius: 2px 2px 0 0;
+            }
+
+            .log-entry {
+                grid-template-columns: 1fr auto;
+                gap: 0.5rem;
+            }
+
+            .log-time,
+            .log-value {
+                display: none;
+            }
+
+            .topbar-right .status-pill:not(:first-child) {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .page-section {
+                padding: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .food-level-card {
+                grid-column: span 2;
+            }
+        }
+
+        /* =============================================
+   CHART CUSTOMIZATION
+   ============================================= */
+        .chart-wrapper {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+        }
+
+        /* =============================================
+   DISPENSING ANIMATION
+   ============================================= */
+        .dispense-visual {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            margin: 1rem 0;
+        }
+
+        .dispense-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            opacity: 0;
+        }
+
+        .dispensing .dispense-dot:nth-child(1) {
+            animation: fall 1s 0s infinite;
+        }
+
+        .dispensing .dispense-dot:nth-child(2) {
+            animation: fall 1s 0.2s infinite;
+        }
+
+        .dispensing .dispense-dot:nth-child(3) {
+            animation: fall 1s 0.4s infinite;
+        }
+
+        @keyframes fall {
+            0% {
+                opacity: 0;
+                transform: translateY(0);
+            }
+
+            20% {
+                opacity: 1;
+            }
+
+            80% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+        }
+
+        /* =============================================
+   SYSTEM STATUS INDICATORS
+   ============================================= */
+        .status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .status-row:last-child {
+            border-bottom: none;
+        }
+
+        .status-key {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-val {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+        }
+
+        .status-val.ok {
+            color: var(--success);
+        }
+
+        .status-val.warn {
+            color: var(--warning);
+        }
+
+        .status-val.err {
+            color: var(--danger);
+        }
+
+        /* =============================================
+   UPTIME DISPLAY
+   ============================================= */
+        .uptime-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 14px;
+            background: var(--success-bg);
+            color: var(--success);
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-family: var(--font-mono);
+            border: 1px solid rgba(102, 187, 106, 0.3);
         }
     </style>
 </head>
 
 <body>
 
-    <div class="dashboard-container">
-        <div class="header">
-            <h1><i class="fas fa-solar-panel"></i> SolarFeed <span style="font-weight: 300;">|</span> Smart Dispenser
-            </h1>
-            <div class="sub"><i class="fas fa-microchip"></i> ESP32 · Solar Powered · Servo: 90° Closed → 40° Open</div>
-        </div>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
 
-        <div class="cards-grid">
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-utensils"></i>
-                    <h3>Food Level</h3>
+    <!-- Schedule Modal -->
+    <div class="modal-overlay" id="scheduleModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Add Feeding Schedule</h3>
+                <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="form-field">
+                <label class="form-label">Feeding Time</label>
+                <input type="time" id="scheduleTime" class="form-input">
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">Label</label>
+                    <input type="text" id="scheduleLabel" class="form-input" placeholder="e.g. Morning Feed">
                 </div>
-                <div class="status-value" id="foodLevelDisplay">--</div>
-                <div id="levelBadge" class="level-badge">⚡ Loading...</div>
-                <div class="flex-row" style="margin-top: 12px;">
-                    <span><i class="fas fa-ruler"></i> Distance:</span>
-                    <span class="distance-cm" id="distanceCm">-- <span class="unit">cm</span></span>
-                </div>
-                <div id="warningMsg" class="warning-text" style="margin-top: 12px; display: none;">
-                    <i class="fas fa-exclamation-triangle"></i> Low / Empty! Refill soon
+                <div class="form-field">
+                    <label class="form-label">Duration (sec)</label>
+                    <input type="number" id="scheduleDuration" class="form-input" value="5" min="1" max="30">
                 </div>
             </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-cogs"></i>
-                    <h3>Gate Servo</h3>
-                </div>
-                <div class="status-badge" id="servoStatusText">
-                    <i class="fas fa-circle" style="font-size: 0.7rem; color: gray;"></i> Unknown
-                </div>
-                <div
-                    style="margin-top: 12px; font-size: 0.8rem; background: #eef5ea; padding: 8px; border-radius: 16px;">
-                    <i class="fas fa-chart-line"></i> Servo angles:
-                    <strong>Closed: 90°</strong> |
-                    <strong>Open: 40°</strong>
-                </div>
-                <button id="servoControlBtn" class="servo-btn">
-                    <i class="fas fa-power-off"></i> <span id="btnLabel">Connect / Toggle</span>
+            <div style="display:flex; gap:0.75rem; margin-top:1rem;">
+                <button class="btn btn-primary" style="flex:1" onclick="saveSchedule()">
+                    <i class="fas fa-save btn-icon"></i>
+                    <div class="spinner"></div>
+                    Save Schedule
                 </button>
-                <div class="timestamp" id="lastUpdateLocal">
-                    <i class="far fa-clock"></i> Last update: --
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-leaf"></i>
-                    <h3>System Health</h3>
-                </div>
-                <div><i class="fas fa-battery-full"></i> Solar power: <strong>ACTIVE</strong> <span
-                        style="color: #2b6e3c;">✔️</span></div>
-                <div style="margin-top: 12px;"><i class="fas fa-microphone-alt"></i> Sensor: Ultrasonic HC-SR04</div>
-                <div><i class="fas fa-database"></i> Backend: Supabase Realtime</div>
-                <div id="supabaseStatus"
-                    style="margin-top: 12px; background:#eef5ea; border-radius: 20px; padding: 6px 10px;">
-                    <i class="fas fa-sync-alt"></i> Live updates via Supabase
-                </div>
+                <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
             </div>
         </div>
-
-        <div class="history-section">
-            <h3><i class="fas fa-history"></i> Feeding & Sensor History</h3>
-            <div id="historyLog" class="history-log">
-                <div style="padding: 1rem; text-align: center; color: #6b8c5c;">Loading history from Supabase...</div>
-            </div>
-        </div>
-        <footer>
-            <i class="fas fa-wifi"></i> ESP32 posts sensor data to Supabase | ultrasonic (GPIO27, GPIO25) | servo
-            (GPIO13) | Manual toggle updates gate state
-        </footer>
     </div>
+
+    <!-- App Layout -->
+    <div class="app-layout">
+
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-logo">
+                <i class="fas fa-solar-panel"></i>
+            </div>
+            <div class="nav-group">
+                <button class="nav-btn active" onclick="showSection('dashboard')" title="Dashboard">
+                    <i class="fas fa-th-large"></i>
+                    <span class="tooltip">Dashboard</span>
+                </button>
+                <button class="nav-btn" onclick="showSection('schedule')" title="Schedule">
+                    <i class="fas fa-clock"></i>
+                    <span class="tooltip">Schedule</span>
+                </button>
+                <button class="nav-btn" onclick="showSection('analytics')" title="Analytics">
+                    <i class="fas fa-chart-area"></i>
+                    <span class="tooltip">Analytics</span>
+                </button>
+                <button class="nav-btn" onclick="showSection('logs')" title="Logs">
+                    <i class="fas fa-list-ul"></i>
+                    <span class="tooltip">Logs</span>
+                </button>
+            </div>
+            <div class="nav-divider"></div>
+            <div class="sidebar-bottom">
+                <button class="nav-btn" onclick="showSection('settings')" title="Settings">
+                    <i class="fas fa-cog"></i>
+                    <span class="tooltip">Settings</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="main-content">
+
+            <!-- Top Bar -->
+            <header class="topbar">
+                <div class="topbar-title">Solar<span>Feed</span> IoT</div>
+                <div class="topbar-right">
+                    <div class="realtime-pulse">
+                        <div class="pulse-ring"></div>
+                        <span>Live</span>
+                    </div>
+                    <div class="status-pill">
+                        <div class="status-dot" id="wifiDot"></div>
+                        <span id="wifiLabel">WiFi</span>
+                    </div>
+                    <div class="status-pill">
+                        <div class="status-dot" id="esp32Dot"></div>
+                        <span id="esp32Label">ESP32</span>
+                    </div>
+                    <div class="status-pill">
+                        <div class="status-dot" id="supabaseDot"></div>
+                        <span id="supabaseLabel">Supabase</span>
+                    </div>
+                    <div class="datetime-display" id="clockDisplay"></div>
+                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                        <i class="fas fa-moon" id="themeIcon"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- =============================================
+         DASHBOARD SECTION
+         ============================================= -->
+            <section class="page-section active" id="section-dashboard">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">Overview</div>
+                        <div class="section-subtitle">Real-time monitoring · ESP32 + Solar Powered</div>
+                    </div>
+                    <button class="btn btn-outline" onclick="fetchLatestData()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Left column -->
+                    <div style="display:flex; flex-direction:column; gap:1rem;">
+
+                        <!-- Food Level Card -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon"><i class="fas fa-layer-group"></i></div>
+                                <div class="card-title">Food Level</div>
+                                <div style="margin-left:auto">
+                                    <span class="level-badge" id="levelBadge">⚡ Loading</span>
+                                </div>
+                            </div>
+                            <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;">
+                                <div class="stat-value" id="foodPctDisplay">--<span class="stat-unit">%</span></div>
+                                <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
+                                    <i class="fas fa-ruler" style="color:var(--text-muted); font-size:0.85rem;"></i>
+                                    <span
+                                        style="font-family:var(--font-mono); font-size:1.4rem; font-weight:600; color:var(--text-secondary);"
+                                        id="distanceCm">--</span>
+                                    <span style="color:var(--text-muted); font-size:0.9rem;">cm</span>
+                                </div>
+                            </div>
+                            <div class="progress-track">
+                                <div class="progress-fill" id="progressFill" style="width:0%"></div>
+                            </div>
+                            <div
+                                style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-dim); margin-bottom:0.5rem;">
+                                <span>Empty</span><span>Low</span><span>Medium</span><span>Full</span>
+                            </div>
+                            <div class="refill-alert" id="refillAlert">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Low Food Alert!</strong> Container needs refilling — distance exceeds threshold.
+                            </div>
+                            <div
+                                style="margin-top:1rem; font-size:0.78rem; color:var(--text-muted); display:flex; align-items:center; gap:6px;">
+                                <i class="far fa-clock"></i>
+                                <span id="lastUpdatedDash">Last updated: --</span>
+                            </div>
+                        </div>
+
+                        <!-- Servo Control Card -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon"><i class="fas fa-cog"></i></div>
+                                <div class="card-title">Servo Gate Control</div>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; align-items:center;">
+                                <div class="servo-visual">
+                                    <div class="servo-dial">
+                                        <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                                            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)"
+                                                stroke-width="8" />
+                                            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(52,168,83,0.15)"
+                                                stroke-width="8" stroke-dasharray="326" stroke-dashoffset="0"
+                                                stroke-linecap="round" />
+                                            <circle id="servoDial" cx="60" cy="60" r="52" fill="none"
+                                                stroke="var(--accent)" stroke-width="8" stroke-dasharray="326"
+                                                stroke-dashoffset="163" stroke-linecap="round"
+                                                transform="rotate(-90 60 60)"
+                                                style="transition:stroke-dashoffset 1s ease" />
+                                            <circle cx="60" cy="60" r="20" fill="var(--bg-secondary)" />
+                                            <line id="servoNeedle" x1="60" y1="60" x2="60" y2="16"
+                                                stroke="var(--accent)" stroke-width="3" stroke-linecap="round"
+                                                style="transform-origin:60px 60px; transform:rotate(0deg); transition:transform 1s ease;" />
+                                            <circle cx="60" cy="60" r="5" fill="var(--accent)" />
+                                        </svg>
+                                    </div>
+                                    <div class="servo-angle-display" id="servoAngleDisplay">90°</div>
+                                    <div class="servo-state-label" id="servoStateLabel">CLOSED</div>
+                                    <div class="dispense-visual" id="dispenseVisual">
+                                        <div class="dispense-dot"></div>
+                                        <div class="dispense-dot"></div>
+                                        <div class="dispense-dot"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="margin-bottom:1rem;">
+                                        <div class="status-row">
+                                            <span class="status-key"><i class="fas fa-lock-open"></i> Open Angle</span>
+                                            <span class="status-val" id="openAngleDisplay">60°</span>
+                                        </div>
+                                        <div class="status-row">
+                                            <span class="status-key"><i class="fas fa-lock"></i> Closed Angle</span>
+                                            <span class="status-val" id="closedAngleDisplay">90°</span>
+                                        </div>
+                                        <div class="status-row">
+                                            <span class="status-key"><i class="fas fa-hourglass"></i> Duration</span>
+                                            <span class="status-val" id="durationDisplay">5s</span>
+                                        </div>
+                                    </div>
+                                    <div class="btn-group" style="flex-direction:column; gap:0.5rem; margin-top:0;">
+                                        <button class="btn btn-primary" id="dispenseBtn" onclick="manualDispense()">
+                                            <i class="fas fa-play btn-icon"></i>
+                                            <div class="spinner"></div>
+                                            Dispense Now
+                                        </button>
+                                        <button class="btn btn-outline" id="toggleServoBtn" onclick="toggleServo()">
+                                            <i class="fas fa-toggle-on btn-icon"></i>
+                                            <div class="spinner"></div>
+                                            <span id="toggleBtnLabel">Toggle Gate</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right column -->
+                    <div style="display:flex; flex-direction:column; gap:1rem;">
+
+                        <!-- System Health -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon"><i class="fas fa-heartbeat"></i></div>
+                                <div class="card-title">System Health</div>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-key"><i class="fas fa-solar-panel"></i> Solar Power</span>
+                                <span class="status-val ok">ACTIVE</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-key"><i class="fas fa-microchip"></i> ESP32</span>
+                                <span class="status-val" id="sysEsp32Status">Checking...</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-key"><i class="fas fa-wifi"></i> WiFi</span>
+                                <span class="status-val" id="sysWifiStatus">--</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-key"><i class="fas fa-database"></i> Supabase</span>
+                                <span class="status-val" id="sysSupabaseStatus">Connecting...</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-key"><i class="fas fa-clock"></i> Uptime</span>
+                                <span class="status-val" id="sysUptime">--</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-key"><i class="fas fa-eye"></i> Last Seen</span>
+                                <span class="status-val" id="sysLastSeen">--</span>
+                            </div>
+                        </div>
+
+                        <!-- Quick Stats -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon"><i class="fas fa-chart-bar"></i></div>
+                                <div class="card-title">Today's Stats</div>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-key"><i class="fas fa-hand-pointer"></i> Manual Feeds</span>
+                                <span class="status-val" id="todayManual">0</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-key"><i class="fas fa-robot"></i> Auto Feeds</span>
+                                <span class="status-val" id="todayAuto">0</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-key"><i class="fas fa-exclamation-triangle"></i> Low Alerts</span>
+                                <span class="status-val" id="todayAlerts" style="color:var(--warning);">0</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-key"><i class="fas fa-history"></i> Last Feed</span>
+                                <span class="status-val" id="lastFeedTime">--</span>
+                            </div>
+                        </div>
+
+                        <!-- Next Feeding -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon"><i class="fas fa-clock"></i></div>
+                                <div class="card-title">Next Feeding</div>
+                            </div>
+                            <div style="text-align:center; padding:1rem 0;">
+                                <div style="font-family:var(--font-mono); font-size:2rem; font-weight:700; color:var(--accent-bright);"
+                                    id="nextFeedDisplay">--:--</div>
+                                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;"
+                                    id="nextFeedLabel">No schedules</div>
+                                <div style="margin-top:0.75rem;" id="countdownDisplay">
+                                    <span class="countdown-badge"><i class="far fa-clock"></i> <span
+                                            id="countdownText">--</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =============================================
+         SCHEDULE SECTION
+         ============================================= -->
+            <section class="page-section" id="section-schedule">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">Feeding Schedules</div>
+                        <div class="section-subtitle">Automatic feeding management</div>
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddScheduleModal()">
+                        <i class="fas fa-plus"></i> Add Schedule
+                    </button>
+                </div>
+                <div id="nextFeedingBanner" class="next-feeding-banner" style="display:none;">
+                    <div>
+                        <div class="next-feeding-label">Next Feeding</div>
+                        <div class="next-feeding-time" id="bannerNextTime">--:--</div>
+                    </div>
+                    <div class="countdown-timer" id="bannerCountdown">--</div>
+                </div>
+                <div class="schedule-grid" id="scheduleGrid">
+                    <div class="empty-state">
+                        <i class="fas fa-clock"></i>
+                        <div>No schedules yet</div>
+                        <div style="font-size:0.8rem; margin-top:4px;">Add your first feeding schedule above</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =============================================
+         ANALYTICS SECTION
+         ============================================= -->
+            <section class="page-section" id="section-analytics">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">Analytics</div>
+                        <div class="section-subtitle">Feeding trends & sensor data</div>
+                    </div>
+                    <select class="filter-select" id="analyticsRange" onchange="updateAnalytics()">
+                        <option value="24h">Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                    </select>
+                </div>
+                <div class="analytics-grid">
+                    <div class="analytics-metric">
+                        <div class="metric-number" id="metricTotal">0</div>
+                        <div class="metric-label">Total Dispenses Today</div>
+                    </div>
+                    <div class="analytics-metric">
+                        <div class="metric-number" id="metricAlerts">0</div>
+                        <div class="metric-label">Low Food Alerts</div>
+                    </div>
+                    <div class="analytics-metric">
+                        <div class="metric-number" id="metricAvgLevel">--%</div>
+                        <div class="metric-label">Avg Food Level</div>
+                    </div>
+                    <div class="analytics-metric">
+                        <div class="metric-number" id="metricReadings">0</div>
+                        <div class="metric-label">Sensor Readings</div>
+                    </div>
+                </div>
+                <div class="charts-grid">
+                    <div class="chart-wrapper">
+                        <div style="font-size:0.85rem; font-weight:600; color:var(--text-muted); margin-bottom:1rem;">
+                            Food Level Over Time</div>
+                        <div class="chart-container">
+                            <canvas id="foodLevelChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div style="font-size:0.85rem; font-weight:600; color:var(--text-muted); margin-bottom:1rem;">
+                            Dispense Frequency</div>
+                        <div class="chart-container">
+                            <canvas id="dispenseChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper dashboard-grid-full">
+                        <div style="font-size:0.85rem; font-weight:600; color:var(--text-muted); margin-bottom:1rem;">
+                            Distance History (cm)</div>
+                        <div class="chart-container" style="height:180px;">
+                            <canvas id="distanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =============================================
+         LOGS SECTION
+         ============================================= -->
+            <section class="page-section" id="section-logs">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">System Logs</div>
+                        <div class="section-subtitle">Full activity history</div>
+                    </div>
+                    <button class="btn btn-outline" onclick="exportLogs()">
+                        <i class="fas fa-download"></i> Export CSV
+                    </button>
+                </div>
+                <div class="log-controls">
+                    <div class="search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="search-input" id="logSearch" placeholder="Search logs..."
+                            oninput="filterLogs()">
+                    </div>
+                    <select class="filter-select" id="logTypeFilter" onchange="filterLogs()">
+                        <option value="all">All Types</option>
+                        <option value="manual">Manual</option>
+                        <option value="auto">Auto</option>
+                        <option value="sensor">Sensor</option>
+                        <option value="alert">Alert</option>
+                        <option value="error">Error</option>
+                        <option value="system">System</option>
+                    </select>
+                    <select class="filter-select" id="logDateFilter" onchange="filterLogs()">
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                    </select>
+                </div>
+                <div class="log-list" id="logList">
+                    <div class="empty-state">
+                        <i class="fas fa-list-ul"></i>
+                        <div>Loading logs...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =============================================
+         SETTINGS SECTION
+         ============================================= -->
+            <section class="page-section" id="section-settings">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">Settings</div>
+                        <div class="section-subtitle">System configuration</div>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveSettings()">
+                        <i class="fas fa-save btn-icon"></i>
+                        <div class="spinner"></div>
+                        Save Settings
+                    </button>
+                </div>
+                <div class="settings-grid">
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <i class="fas fa-cog"></i> Servo Configuration
+                        </div>
+                        <div class="setting-row">
+                            <div>
+                                <div class="setting-label">Open Angle</div>
+                                <div class="setting-desc">Angle when dispensing (default: 60°)</div>
+                            </div>
+                            <input type="number" class="setting-input" id="settingOpenAngle" value="60" min="0"
+                                max="180">
+                        </div>
+                        <div class="setting-row">
+                            <div>
+                                <div class="setting-label">Closed Angle</div>
+                                <div class="setting-desc">Angle when idle (default: 90°)</div>
+                            </div>
+                            <input type="number" class="setting-input" id="settingClosedAngle" value="90" min="0"
+                                max="180">
+                        </div>
+                        <div class="setting-row">
+                            <div>
+                                <div class="setting-label">Dispense Duration</div>
+                                <div class="setting-desc">How long the gate stays open (seconds)</div>
+                            </div>
+                            <input type="number" class="setting-input" id="settingDuration" value="5" min="1" max="30">
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <i class="fas fa-ruler"></i> Sensor Configuration
+                        </div>
+                        <div class="setting-row">
+                            <div>
+                                <div class="setting-label">Empty Distance</div>
+                                <div class="setting-desc">Distance (cm) when container is empty (max range)</div>
+                            </div>
+                            <input type="number" class="setting-input" id="settingEmptyDistance" value="30" min="5"
+                                max="100" step="1">
+                        </div>
+                        <div class="setting-row">
+                            <div>
+                                <div class="setting-label">Full Distance</div>
+                                <div class="setting-desc">Distance (cm) when container is full (min range)</div>
+                            </div>
+                            <input type="number" class="setting-input" id="settingFullDistance" value="0" min="0"
+                                max="30" step="1">
+                        </div>
+                        <div class="setting-row">
+                            <div>
+                                <div class="setting-label">Refill Threshold</div>
+                                <div class="setting-desc">Distance (cm) triggering low food alert</div>
+                            </div>
+                            <input type="number" class="setting-input" id="settingThreshold" value="3" min="1"
+                                max="100">
+                        </div>
+                        <div class="setting-row">
+                            <div>
+                                <div class="setting-label">Sensor Interval</div>
+                                <div class="setting-desc">How often to read sensor (seconds)</div>
+                            </div>
+                            <input type="number" class="setting-input" id="settingInterval" value="5" min="1" max="60">
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <i class="fas fa-info-circle"></i> Hardware Info
+                        </div>
+                        <div class="setting-row">
+                            <span class="status-key">Servo Motor</span>
+                            <span class="status-val">SG90 @ GPIO 13</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="status-key">Ultrasonic TRIG</span>
+                            <span class="status-val">GPIO 27</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="status-key">Ultrasonic ECHO</span>
+                            <span class="status-val">GPIO 25</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="status-key">Power Source</span>
+                            <span class="status-val ok">Solar Panel</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="status-key">MCU</span>
+                            <span class="status-val">ESP32</span>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <i class="fas fa-database"></i> Supabase Connection
+                        </div>
+                        <div class="setting-row">
+                            <div>
+                                <div class="setting-label">Supabase URL</div>
+                            </div>
+                            <span
+                                style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">pjmuvnyztjgp...</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="status-key">Realtime Status</span>
+                            <span class="status-val" id="settingRealtimeStatus">--</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="status-key">Last Sync</span>
+                            <span class="status-val" id="settingLastSync">--</span>
+                        </div>
+                        <div style="margin-top:1rem;">
+                            <button class="btn btn-outline" style="width:100%;" onclick="testConnection()">
+                                <i class="fas fa-plug"></i> Test Connection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div><!-- end main-content -->
+    </div><!-- end app-layout -->
 
     <script>
         // ============================================
-        // YOUR SUPABASE CREDENTIALS (Already configured)
+        // CONFIGURATION
         // ============================================
         const SUPABASE_URL = 'https://pjmuvnyztjgpbxkxjeti.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqbXV2bnl6dGpncGJ4a3hqZXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MTA5NDAsImV4cCI6MjA5Mzk4Njk0MH0.M07zEn_oLiB2dBdjBeVOnP3EXA5ZTBscs8k7EGNvZVk';
 
-        let supabaseClient = null;
-        let isSupabaseConfigured = false;
-        let currentServoState = 'Closed';
+        // ============================================
+        // STATE - FIXED: No duplicate declarations
+        // ============================================
+        let supabaseClient = null;  // Changed from 'supabase' to avoid conflict
+        let isConnected = false;
         let currentDistance = null;
-        let currentFoodLevel = '--';
+        let currentServoAngle = 90;
+        let currentServoState = 'Closed';
+        let schedules = [];
+        let allLogs = [];
+        let settings = {
+            servo_open_angle: 60,
+            servo_closed_angle: 90,
+            dispense_duration: 5,
+            empty_distance_cm: 30,      // NEW: Max distance when empty
+            full_distance_cm: 0,        // NEW: Min distance when full
+            refill_threshold_cm: 3,
+            sensor_interval: 5
+        };
+        let countdownInterval = null;
+        let editScheduleId = null;
+        let foodLevelChart = null;
+        let dispenseChart = null;
+        let distanceChart = null;
+        let supabaseChannel = null;
 
-        // DOM elements
-        const foodLevelSpan = document.getElementById('foodLevelDisplay');
-        const levelBadgeDiv = document.getElementById('levelBadge');
-        const distanceSpan = document.getElementById('distanceCm');
-        const warningMsgDiv = document.getElementById('warningMsg');
-        const servoStatusSpan = document.getElementById('servoStatusText');
-        const servoBtn = document.getElementById('servoControlBtn');
-        const btnLabelSpan = document.getElementById('btnLabel');
-        const lastUpdateSpan = document.getElementById('lastUpdateLocal');
-        const historyContainer = document.getElementById('historyLog');
-        const supabaseStatus = document.getElementById('supabaseStatus');
+        // ============================================
+        // TOAST NOTIFICATION
+        // ============================================
+        function showToast(msg, type = 'success') {
+            const icons = { success: 'fa-check-circle', error: 'fa-times-circle', warning: 'fa-exclamation-triangle' };
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
 
-        function formatTimestamp(dateObj) {
-            if (!dateObj) return 'Just now';
-            const d = new Date(dateObj);
-            return d.toLocaleString();
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<i class="fas ${icons[type]} toast-icon"></i><span>${msg}</span>`;
+            container.appendChild(t);
+
+            setTimeout(() => {
+                t.style.animation = 'toastOut 0.4s forwards';
+                setTimeout(() => t.remove(), 400);
+            }, 3500);
         }
 
-        function getFoodLevelFromDistance(cm) {
-            if (cm === null || isNaN(cm)) return 'Unknown';
-            if (cm <= 10) return 'Full';
-            if (cm <= 20) return 'Medium';
-            if (cm <= 35) return 'Low';
-            return 'Empty';
-        }
+        // ============================================
+        // SUPABASE INIT - FIXED
+        // ============================================
+        async function initSupabase() {
+            try {
+                console.log('Initializing Supabase...');
 
-        function updateUIFromDistance(dist) {
-            if (dist === null) return;
-            currentDistance = dist;
-            const level = getFoodLevelFromDistance(dist);
-            currentFoodLevel = level;
-            distanceSpan.innerText = dist.toFixed(1);
-            foodLevelSpan.innerText = level;
+                if (!window.supabase) {
+                    throw new Error('Supabase library not loaded');
+                }
 
-            let badgeColor = '';
-            let icon = '';
-            if (level === 'Full') { badgeColor = '#2b6e3c'; icon = '🍽️ '; }
-            else if (level === 'Medium') { badgeColor = '#e6a017'; icon = '🟡 '; }
-            else if (level === 'Low') { badgeColor = '#e67e22'; icon = '⚠️ '; }
-            else { badgeColor = '#d9534f'; icon = '🔴 '; }
-            levelBadgeDiv.innerHTML = `${icon} ${level}`;
-            levelBadgeDiv.style.background = badgeColor + '20';
-            levelBadgeDiv.style.color = badgeColor;
-            levelBadgeDiv.style.border = `1px solid ${badgeColor}60`;
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-            if (level === 'Low' || level === 'Empty') {
-                warningMsgDiv.style.display = 'flex';
-                warningMsgDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${level} food level! Refill container soon.`;
-            } else {
-                warningMsgDiv.style.display = 'none';
+                // Test connection with better error handling
+                console.log('Testing connection...');
+                const { data, error } = await supabaseClient
+                    .from('sensor_readings')
+                    .select('count', { count: 'exact', head: true });
+
+                if (error) {
+                    console.error('Connection test failed:', error);
+
+                    // Provide specific error messages
+                    if (error.message.includes('relation') || error.message.includes('does not exist')) {
+                        showToast('Database tables missing! Please run the SQL schema in Supabase.', 'error');
+                        document.getElementById('sysSupabaseStatus').textContent = 'Missing Tables';
+                    } else if (error.message.includes('JWT') || error.message.includes('api key')) {
+                        showToast('Invalid API key! Check your Supabase anon key.', 'error');
+                        document.getElementById('sysSupabaseStatus').textContent = 'Invalid Key';
+                    } else if (error.message.includes('CORS')) {
+                        showToast('CORS error! Configure CORS in Supabase dashboard.', 'error');
+                        document.getElementById('sysSupabaseStatus').textContent = 'CORS Error';
+                    } else {
+                        showToast(`Connection failed: ${error.message}`, 'error');
+                        document.getElementById('sysSupabaseStatus').textContent = 'Error';
+                    }
+
+                    document.getElementById('sysSupabaseStatus').className = 'status-val err';
+                    throw error;
+                }
+
+                isConnected = true;
+                updateStatusIndicators('connected');
+                showToast('Connected to Supabase successfully!', 'success');
+                document.getElementById('sysSupabaseStatus').textContent = 'Connected';
+                document.getElementById('sysSupabaseStatus').className = 'status-val ok';
+
+                setupRealtimeSubscriptions();
+
+                // Fetch all data with individual error handling
+                await fetchLatestData();
+                await fetchSchedules();
+                await fetchSettings();
+                await fetchLogs();
+                await updateAnalytics();
+
+                document.getElementById('settingRealtimeStatus').textContent = 'Active';
+                document.getElementById('settingRealtimeStatus').className = 'status-val ok';
+
+                // Enable any disabled buttons
+                document.querySelectorAll('.btn').forEach(btn => {
+                    btn.disabled = false;
+                    btn.classList.remove('loading');
+                });
+
+            } catch (err) {
+                console.error('Supabase init failed:', err);
+                isConnected = false;
+                updateStatusIndicators('error');
+                document.getElementById('sysSupabaseStatus').textContent = 'Error';
+                document.getElementById('sysSupabaseStatus').className = 'status-val err';
+
+                // Try to use demo mode
+                useDemoMode();
             }
         }
 
-        function updateServoUI(state) {
-            currentServoState = state;
-            if (state === 'Open') {
-                servoStatusSpan.innerHTML = '<i class="fas fa-circle" style="color:#2ecc71;"></i> Gate: OPEN · dispensing (40°)';
-                servoBtn.classList.remove('closed');
-                servoBtn.classList.add('open');
-                btnLabelSpan.innerHTML = '<i class="fas fa-door-closed"></i> Close Gate → 90°';
-            } else {
-                servoStatusSpan.innerHTML = '<i class="fas fa-circle" style="color:#e67e22;"></i> Gate: CLOSED · standby (90°)';
-                servoBtn.classList.remove('open');
-                servoBtn.classList.add('closed');
-                btnLabelSpan.innerHTML = '<i class="fas fa-door-open"></i> Open Gate → 40°';
-            }
-        }
+        // ============================================
+        // DEMO MODE - For testing without database
+        // ============================================
+        function useDemoMode() {
+            console.log('Starting in DEMO mode (no database connection)');
+            showToast('Running in demo mode - no database connection', 'warning');
 
-        function renderHistoryLog(entries) {
-            if (!entries || entries.length === 0) {
-                historyContainer.innerHTML = '<div style="padding: 1rem; text-align: center;">📭 No sensor logs yet. Send data from ESP32.</div>';
-                return;
-            }
-            historyContainer.innerHTML = '';
-            entries.slice().reverse().forEach(entry => {
-                const logDiv = document.createElement('div');
-                logDiv.className = 'log-entry';
-                if (entry.food_level === 'Empty' || entry.food_level === 'Low') logDiv.classList.add('empty-warning');
-                const timeStr = entry.created_at ? formatTimestamp(entry.created_at) : 'recent';
-                logDiv.innerHTML = `
-                    <span><i class="fas fa-microchip"></i> ${entry.distance_cm?.toFixed(1)} cm · ${entry.food_level}</span>
-                    <span class="log-level">${entry.food_level}</span>
-                    <span style="font-size:0.7rem; color:#5e7a4a;">${timeStr}</span>
-                `;
-                historyContainer.appendChild(logDiv);
+            // Set demo data
+            updateFoodLevelUI(8.5, 72);
+            updateServoUI('Closed', 90);
+
+            // Demo schedules
+            schedules = [
+                { id: 1, feeding_time: '08:00', label: 'Morning Feed', enabled: true, duration_seconds: 5 },
+                { id: 2, feeding_time: '18:00', label: 'Evening Feed', enabled: true, duration_seconds: 5 }
+            ];
+            renderSchedules();
+            updateNextFeeding();
+
+            // Demo logs
+            allLogs = [
+                { type: 'system', message: 'System started in demo mode', value: '', created_at: new Date().toISOString() },
+                { type: 'sensor', message: 'Food level: Medium - 72%', value: '8.5cm', created_at: new Date().toISOString() },
+                { type: 'system', message: 'Manual dispense would work here', value: '', created_at: new Date(Date.now() - 3600000).toISOString() }
+            ];
+            renderLogs(allLogs);
+
+            // Demo stats
+            document.getElementById('todayManual').textContent = '3';
+            document.getElementById('todayAuto').textContent = '2';
+            document.getElementById('metricTotal').textContent = '5';
+            document.getElementById('metricAlerts').textContent = '1';
+            document.getElementById('metricAvgLevel').textContent = '68%';
+            document.getElementById('metricReadings').textContent = '156';
+
+            // Override button functions for demo
+            window.manualDispense = function () {
+                showToast('Demo: Manual dispense triggered!', 'success');
+                updateServoUI('Open', 60);
+                setTimeout(() => updateServoUI('Closed', 90), 3000);
+            };
+
+            window.toggleServo = function () {
+                const newState = currentServoState === 'Closed' ? 'Open' : 'Closed';
+                const angle = newState === 'Open' ? 60 : 90;
+                updateServoUI(newState, angle);
+                showToast(`Demo: Gate ${newState}`, 'success');
+            };
+
+            // Enable buttons
+            document.querySelectorAll('.btn').forEach(btn => {
+                btn.disabled = false;
+                btn.classList.remove('loading');
             });
         }
 
+        // ============================================
+        // REALTIME SUBSCRIPTIONS
+        // ============================================
+        function setupRealtimeSubscriptions() {
+            if (!supabaseClient) return;
+
+            if (supabaseChannel) {
+                supabaseClient.removeChannel(supabaseChannel);
+            }
+
+            supabaseChannel = supabaseClient.channel('dashboard_realtime');
+
+            supabaseChannel
+                .on('postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'sensor_readings' },
+                    (payload) => {
+                        if (payload.new) {
+                            updateFoodLevelUI(payload.new.distance_cm, payload.new.food_percentage);
+                            document.getElementById('settingLastSync').textContent = new Date().toLocaleTimeString();
+                        }
+                    }
+                )
+                .on('postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'servo_state' },
+                    (payload) => {
+                        if (payload.new) updateServoUI(payload.new.state, payload.new.angle);
+                    }
+                )
+                .on('postgres_changes',
+                    { event: '*', schema: 'public', table: 'feeding_schedules' },
+                    () => {
+                        fetchSchedules();
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Realtime subscription status:', status);
+                });
+        }
+
+        // ============================================
+        // FETCH LATEST DATA
+        // ============================================
         async function fetchLatestData() {
-            if (!supabaseClient || !isSupabaseConfigured) return;
+            if (!supabaseClient) return;
+
             try {
-                const { data: sensorData, error: sensorErr } = await supabaseClient
+                const { data: sensorData, error: sensorError } = await supabaseClient
                     .from('sensor_readings')
                     .select('*')
                     .order('created_at', { ascending: false })
                     .limit(1);
-                if (!sensorErr && sensorData && sensorData.length > 0) {
-                    const latest = sensorData[0];
-                    updateUIFromDistance(latest.distance_cm);
-                    lastUpdateSpan.innerHTML = `<i class="far fa-clock"></i> Last data: ${formatTimestamp(latest.created_at)}`;
+
+                if (sensorError) throw sensorError;
+
+                if (sensorData && sensorData[0]) {
+                    const r = sensorData[0];
+                    updateFoodLevelUI(r.distance_cm, r.food_percentage);
+                    const ts = new Date(r.created_at).toLocaleTimeString();
+                    document.getElementById('lastUpdatedDash').textContent = `Last updated: ${ts}`;
+                    document.getElementById('settingLastSync').textContent = ts;
                 }
 
-                const { data: servoData, error: servoErr } = await supabaseClient
+                const { data: servoData, error: servoError } = await supabaseClient
                     .from('servo_state')
                     .select('*')
                     .limit(1);
-                if (!servoErr && servoData && servoData.length > 0) {
-                    updateServoUI(servoData[0].state);
+
+                if (servoError) throw servoError;
+
+                if (servoData && servoData[0]) {
+                    updateServoUI(servoData[0].state, servoData[0].angle);
                 }
 
-                const { data: history, error: histErr } = await supabaseClient
-                    .from('sensor_readings')
+                const { data: statusData, error: statusError } = await supabaseClient
+                    .from('system_status')
                     .select('*')
-                    .order('created_at', { ascending: false })
-                    .limit(20);
-                if (!histErr && history) {
-                    renderHistoryLog(history);
+                    .limit(1);
+
+                if (statusError) throw statusError;
+
+                if (statusData && statusData[0]) {
+                    updateSystemStatus(statusData[0]);
                 }
+
+                await updateTodayStats();
+
             } catch (err) {
-                console.error("Supabase fetch error:", err);
+                console.error('Fetch error:', err);
+                if (isConnected) {
+                    showToast('Failed to fetch data: ' + err.message, 'error');
+                }
             }
         }
 
-        async function toggleServoState() {
-            if (!supabaseClient || !isSupabaseConfigured) {
-                alert("⚠️ Supabase not connected. Check your internet or Supabase credentials.");
+        // ============================================
+        // FOOD LEVEL UI
+        // ============================================
+        function getFoodPercentage(cm, maxCm = null, minCm = null) {
+            if (!cm || cm < 0) return 0;
+            // Use settings if available, otherwise use defaults
+            const maxDistance = (maxCm !== null) ? maxCm : (settings.empty_distance_cm || 30);
+            const minDistance = (minCm !== null) ? minCm : (settings.full_distance_cm || 0);
+
+            // Clamp the distance between min and max
+            const clampedCm = Math.min(Math.max(cm, minDistance), maxDistance);
+
+            // Calculate percentage: 100% when distance = min (full), 0% when distance = max (empty)
+            const pct = ((maxDistance - clampedCm) / (maxDistance - minDistance)) * 100;
+            return Math.round(Math.max(0, Math.min(100, pct)));
+        }
+
+        function getFoodLevel(cm) {
+            if (!cm || cm < 0) return { level: 'Unknown', pct: 0, cls: 'empty' };
+
+            const emptyDist = settings.empty_distance_cm || 30;
+            const fullDist = settings.full_distance_cm || 0;
+
+            // Calculate percentage for level thresholds
+            const range = emptyDist - fullDist;
+            const pct = ((emptyDist - cm) / range) * 100;
+
+            if (pct >= 85) return { level: 'Full', pct: 100, cls: 'full' };
+            if (pct >= 50) return { level: 'Medium', pct: 65, cls: 'medium' };
+            if (pct >= 15) return { level: 'Low', pct: 30, cls: 'low' };
+            return { level: 'Empty', pct: 5, cls: 'empty' };
+        }
+
+        function updateFoodLevelUI(distanceCm, foodPct) {
+            currentDistance = distanceCm;
+            const pct = (foodPct !== null && foodPct !== undefined) ? foodPct : getFoodPercentage(distanceCm);
+            const { level, cls } = getFoodLevel(distanceCm);
+
+            const pctElement = document.getElementById('foodPctDisplay');
+            const distanceElement = document.getElementById('distanceCm');
+            const fillElement = document.getElementById('progressFill');
+            const badgeElement = document.getElementById('levelBadge');
+            const alertElement = document.getElementById('refillAlert');
+
+            if (pctElement) pctElement.innerHTML = `${pct}<span class="stat-unit">%</span>`;
+            if (distanceElement) distanceElement.textContent = distanceCm?.toFixed(1) ?? '--';
+
+            if (fillElement) {
+                fillElement.style.width = pct + '%';
+                fillElement.className = 'progress-fill' + (cls === 'empty' ? ' critical' : cls === 'low' ? ' low' : '');
+            }
+
+            if (badgeElement) {
+                badgeElement.textContent = level;
+                badgeElement.className = `level-badge ${cls}`;
+            }
+
+            if (alertElement) {
+                const threshold = settings.refill_threshold_cm ?? 3;
+                if (distanceCm > threshold) {
+                    alertElement.classList.add('show');
+                } else {
+                    alertElement.classList.remove('show');
+                }
+            }
+        }
+
+        // ============================================
+        // SERVO UI
+        // ============================================
+        function updateServoUI(state, angle) {
+            currentServoState = state;
+            currentServoAngle = angle || (state === 'Open' ? settings.servo_open_angle : settings.servo_closed_angle);
+            const isOpen = state === 'Open';
+
+            const angleDisplay = document.getElementById('servoAngleDisplay');
+            const stateLabel = document.getElementById('servoStateLabel');
+            const toggleBtnLabel = document.getElementById('toggleBtnLabel');
+            const needle = document.getElementById('servoNeedle');
+            const dial = document.getElementById('servoDial');
+            const dispVis = document.getElementById('dispenseVisual');
+
+            if (angleDisplay) angleDisplay.textContent = `${currentServoAngle}°`;
+            if (stateLabel) stateLabel.textContent = state.toUpperCase();
+            if (toggleBtnLabel) toggleBtnLabel.textContent = isOpen ? 'Close Gate' : 'Open Gate';
+
+            if (needle) {
+                const visualAngle = (currentServoAngle / 180) * 180 - 90;
+                needle.style.transform = `rotate(${visualAngle}deg)`;
+            }
+
+            if (dial) {
+                const fullCircumf = 326;
+                const progress = currentServoAngle / 180;
+                dial.style.strokeDashoffset = fullCircumf * (1 - progress);
+            }
+
+            if (dispVis) {
+                if (isOpen) {
+                    dispVis.classList.add('dispensing');
+                } else {
+                    dispVis.classList.remove('dispensing');
+                }
+            }
+        }
+
+        // ============================================
+        // SYSTEM STATUS
+        // ============================================
+        function updateSystemStatus(status) {
+            const esp32El = document.getElementById('sysEsp32Status');
+            const wifiEl = document.getElementById('sysWifiStatus');
+            const uptimeEl = document.getElementById('sysUptime');
+            const lastSeenEl = document.getElementById('sysLastSeen');
+            const wifiDot = document.getElementById('wifiDot');
+            const esp32Dot = document.getElementById('esp32Dot');
+
+            if (esp32El) {
+                if (status.esp32_online) {
+                    esp32El.textContent = 'Online';
+                    esp32El.className = 'status-val ok';
+                    if (esp32Dot) esp32Dot.className = 'status-dot online';
+                } else {
+                    esp32El.textContent = 'Offline';
+                    esp32El.className = 'status-val err';
+                    if (esp32Dot) esp32Dot.className = 'status-dot offline';
+                }
+            }
+
+            if (wifiEl) {
+                const wifi = status.wifi_status;
+                wifiEl.textContent = wifi || '--';
+                wifiEl.className = (wifi && wifi !== 'unknown') ? 'status-val ok' : 'status-val err';
+            }
+
+            if (uptimeEl && status.uptime_seconds) {
+                const h = Math.floor(status.uptime_seconds / 3600);
+                const m = Math.floor((status.uptime_seconds % 3600) / 60);
+                uptimeEl.textContent = `${h}h ${m}m`;
+            }
+
+            if (lastSeenEl && status.last_seen) {
+                lastSeenEl.textContent = new Date(status.last_seen).toLocaleTimeString();
+            }
+        }
+
+        // ============================================
+        // STATUS INDICATORS
+        // ============================================
+        function updateStatusIndicators(status) {
+            const dot = document.getElementById('supabaseDot');
+            const label = document.getElementById('supabaseLabel');
+            const sysEl = document.getElementById('sysSupabaseStatus');
+
+            if (dot && label && sysEl) {
+                if (status === 'connected') {
+                    dot.className = 'status-dot online';
+                    label.textContent = 'Supabase';
+                    sysEl.textContent = 'Connected';
+                    sysEl.className = 'status-val ok';
+                } else {
+                    dot.className = 'status-dot offline';
+                    label.textContent = 'Offline';
+                    sysEl.textContent = 'Error';
+                    sysEl.className = 'status-val err';
+                }
+            }
+        }
+
+        // ============================================
+        // MANUAL DISPENSE
+        // ============================================
+        window.manualDispense = async function () {
+            if (!supabaseClient && !isConnected) {
+                showToast('Demo mode: Dispense simulated', 'success');
+                updateServoUI('Open', 60);
+                setTimeout(() => updateServoUI('Closed', 90), 3000);
                 return;
             }
-            const targetState = currentServoState === 'Closed' ? 'Open' : 'Closed';
+
+            const btn = document.getElementById('dispenseBtn');
+            if (!btn) return;
+
+            const duration = settings.dispense_duration ?? 5;
+
+            btn.classList.add('loading');
+            btn.disabled = true;
+
             try {
+                const openAngle = settings.servo_open_angle ?? 60;
+                const closedAngle = settings.servo_closed_angle ?? 90;
+
+                const { error: updateError } = await supabaseClient
+                    .from('servo_state')
+                    .upsert({
+                        id: 1,
+                        state: 'Open',
+                        angle: openAngle,
+                        updated_at: new Date().toISOString()
+                    });
+
+                if (updateError) throw updateError;
+
+                updateServoUI('Open', openAngle);
+
+                await supabaseClient.from('feeding_logs').insert({
+                    type: 'manual',
+                    action: 'dispense',
+                    servo_angle: openAngle,
+                    note: `Manual dispense for ${duration}s`,
+                    created_at: new Date().toISOString()
+                });
+
+                showToast(`Dispensing for ${duration} seconds...`, 'success');
+
+                await new Promise(r => setTimeout(r, duration * 1000));
+
+                await supabaseClient.from('servo_state').upsert({
+                    id: 1,
+                    state: 'Closed',
+                    angle: closedAngle,
+                    updated_at: new Date().toISOString()
+                });
+
+                updateServoUI('Closed', closedAngle);
+                showToast('Dispensing complete!', 'success');
+
+                await updateTodayStats();
+            } catch (err) {
+                console.error('Dispense error:', err);
+                showToast('Dispense failed: ' + err.message, 'error');
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        };
+
+        // ============================================
+        // TOGGLE SERVO
+        // ============================================
+        window.toggleServo = async function () {
+            if (!supabaseClient && !isConnected) {
+                const newState = currentServoState === 'Closed' ? 'Open' : 'Closed';
+                const angle = newState === 'Open' ? 60 : 90;
+                updateServoUI(newState, angle);
+                showToast(`Demo: Gate ${newState}`, 'success');
+                return;
+            }
+
+            const btn = document.getElementById('toggleServoBtn');
+            if (!btn) return;
+
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            try {
+                const newState = currentServoState === 'Closed' ? 'Open' : 'Closed';
+                const angle = newState === 'Open' ? (settings.servo_open_angle ?? 60) : (settings.servo_closed_angle ?? 90);
+
                 const { error } = await supabaseClient
                     .from('servo_state')
-                    .update({ state: targetState, updated_at: new Date().toISOString() })
-                    .eq('id', 1);
+                    .upsert({
+                        id: 1,
+                        state: newState,
+                        angle,
+                        updated_at: new Date().toISOString()
+                    });
 
-                if (error) {
-                    const { error: upsertErr } = await supabaseClient
-                        .from('servo_state')
-                        .upsert({ id: 1, state: targetState, updated_at: new Date().toISOString() });
-                    if (upsertErr) throw upsertErr;
-                }
-                updateServoUI(targetState);
-                await addManualActionLog(targetState);
-                await fetchLatestData();
+                if (error) throw error;
+
+                updateServoUI(newState, angle);
+                showToast(`Gate ${newState}`, 'success');
             } catch (err) {
-                console.error('Toggle failed', err);
-                alert('Error updating servo state: ' + err.message);
+                console.error('Toggle error:', err);
+                showToast('Toggle failed: ' + err.message, 'error');
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        };
+
+        // ============================================
+        // TODAY STATS
+        // ============================================
+        async function updateTodayStats() {
+            if (!supabaseClient) return;
+
+            try {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const { data: logs, error: logsError } = await supabaseClient
+                    .from('feeding_logs')
+                    .select('*')
+                    .gte('created_at', today.toISOString());
+
+                if (logsError) throw logsError;
+
+                const manual = logs?.filter(l => l.type === 'manual').length ?? 0;
+                const auto = logs?.filter(l => l.type === 'automatic').length ?? 0;
+
+                const manualEl = document.getElementById('todayManual');
+                const autoEl = document.getElementById('todayAuto');
+                const metricTotalEl = document.getElementById('metricTotal');
+                const lastFeedTimeEl = document.getElementById('lastFeedTime');
+
+                if (manualEl) manualEl.textContent = manual;
+                if (autoEl) autoEl.textContent = auto;
+                if (metricTotalEl) metricTotalEl.textContent = manual + auto;
+
+                if (logs && logs.length > 0 && lastFeedTimeEl) {
+                    const last = logs[logs.length - 1];
+                    const t = new Date(last.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    lastFeedTimeEl.textContent = t;
+                }
+
+                const { data: alerts, error: alertsError } = await supabaseClient
+                    .from('sensor_readings')
+                    .select('*')
+                    .gte('created_at', today.toISOString())
+                    .in('food_level', ['Low', 'Empty']);
+
+                if (alertsError) throw alertsError;
+
+                const alertCount = alerts?.length ?? 0;
+                const todayAlertsEl = document.getElementById('todayAlerts');
+                const metricAlertsEl = document.getElementById('metricAlerts');
+
+                if (todayAlertsEl) todayAlertsEl.textContent = alertCount;
+                if (metricAlertsEl) metricAlertsEl.textContent = alertCount;
+
+            } catch (err) {
+                console.error('Error updating stats:', err);
             }
         }
 
-        async function addManualActionLog(servoStateAction) {
-            if (!supabaseClient || !isSupabaseConfigured) return;
-            if (currentDistance !== null) {
-                const level = getFoodLevelFromDistance(currentDistance);
-                await supabaseClient.from('sensor_readings').insert({
-                    distance_cm: currentDistance,
-                    food_level: level,
-                    created_at: new Date().toISOString(),
-                    note: `Manual gate ${servoStateAction}`
+        // ============================================
+        // SCHEDULES
+        // ============================================
+        async function fetchSchedules() {
+            if (!supabaseClient) return;
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('feeding_schedules')
+                    .select('*')
+                    .order('feeding_time');
+
+                if (error) throw error;
+
+                schedules = data ?? [];
+                renderSchedules();
+                updateNextFeeding();
+            } catch (err) {
+                console.error('Error fetching schedules:', err);
+            }
+        }
+
+        function renderSchedules() {
+            const grid = document.getElementById('scheduleGrid');
+            if (!grid) return;
+
+            if (schedules.length === 0) {
+                grid.innerHTML = `<div class="empty-state"><i class="fas fa-clock"></i><div>No schedules yet</div><div style="font-size:0.8rem;margin-top:4px;">Add your first feeding schedule above</div></div>`;
+                return;
+            }
+
+            grid.innerHTML = schedules.map(s => {
+                const t = s.feeding_time?.slice(0, 5) ?? '--:--';
+                return `
+    <div class="schedule-card" id="sched-${s.id}">
+      <div class="schedule-time">${t}</div>
+      <div class="schedule-info">
+        <div class="schedule-name">${s.label || 'Feeding'}</div>
+        <div class="schedule-meta"><i class="fas fa-hourglass" style="font-size:0.7rem;"></i> ${s.duration_seconds ?? 5}s · Daily</div>
+      </div>
+      <label class="toggle-switch" title="${s.enabled ? 'Enabled' : 'Disabled'}">
+        <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="toggleSchedule(${s.id}, this.checked)">
+        <div class="toggle-track"></div>
+      </label>
+      <div class="schedule-actions">
+        <button class="icon-btn" onclick="openEditScheduleModal(${s.id})" title="Edit"><i class="fas fa-pen"></i></button>
+        <button class="icon-btn danger" onclick="deleteSchedule(${s.id})" title="Delete"><i class="fas fa-trash"></i></button>
+      </div>
+    </div>`;
+            }).join('');
+        }
+
+        function updateNextFeeding() {
+            const enabled = schedules.filter(s => s.enabled);
+            const nextFeedDisplay = document.getElementById('nextFeedDisplay');
+            const nextFeedLabel = document.getElementById('nextFeedLabel');
+            const nextFeedingBanner = document.getElementById('nextFeedingBanner');
+            const countdownText = document.getElementById('countdownText');
+            const bannerCountdown = document.getElementById('bannerCountdown');
+
+            if (enabled.length === 0) {
+                if (nextFeedDisplay) nextFeedDisplay.textContent = '--:--';
+                if (nextFeedLabel) nextFeedLabel.textContent = 'No active schedules';
+                if (nextFeedingBanner) nextFeedingBanner.style.display = 'none';
+                if (countdownInterval) clearInterval(countdownInterval);
+                return;
+            }
+
+            const now = new Date();
+            const nowMin = now.getHours() * 60 + now.getMinutes();
+
+            let soonest = null;
+            let soonestMin = Infinity;
+
+            enabled.forEach(s => {
+                const [h, m] = (s.feeding_time || '00:00').split(':').map(Number);
+                let diff = h * 60 + m - nowMin;
+                if (diff < 0) diff += 1440;
+                if (diff < soonestMin) { soonestMin = diff; soonest = s; }
+            });
+
+            if (!soonest) return;
+
+            const t = soonest.feeding_time?.slice(0, 5) ?? '--:--';
+            if (nextFeedDisplay) nextFeedDisplay.textContent = t;
+            if (nextFeedLabel) nextFeedLabel.textContent = soonest.label || 'Scheduled Feeding';
+            if (nextFeedingBanner) nextFeedingBanner.style.display = 'flex';
+
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            countdownInterval = setInterval(() => {
+                const n = new Date();
+                const nMin = n.getHours() * 60 + n.getMinutes() + n.getSeconds() / 60;
+                const [h2, m2] = (soonest.feeding_time || '00:00').split(':').map(Number);
+                let diff = h2 * 60 + m2 - nMin;
+                if (diff < 0) diff += 1440;
+                const hrs = Math.floor(diff);
+                const mins = Math.floor((diff - hrs) * 60);
+                const secs = Math.floor(((diff - hrs) * 60 - mins) * 60);
+                const str = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                if (countdownText) countdownText.textContent = str;
+                if (bannerCountdown) bannerCountdown.textContent = str;
+            }, 1000);
+        }
+
+        window.openAddScheduleModal = function () {
+            editScheduleId = null;
+            const modalTitle = document.getElementById('modalTitle');
+            const scheduleTime = document.getElementById('scheduleTime');
+            const scheduleLabel = document.getElementById('scheduleLabel');
+            const scheduleDuration = document.getElementById('scheduleDuration');
+            const scheduleModal = document.getElementById('scheduleModal');
+
+            if (modalTitle) modalTitle.textContent = 'Add Feeding Schedule';
+            if (scheduleTime) scheduleTime.value = '';
+            if (scheduleLabel) scheduleLabel.value = '';
+            if (scheduleDuration) scheduleDuration.value = 5;
+            if (scheduleModal) scheduleModal.classList.add('open');
+        };
+
+        window.openEditScheduleModal = function (id) {
+            const s = schedules.find(x => x.id === id);
+            if (!s) return;
+
+            editScheduleId = id;
+            const modalTitle = document.getElementById('modalTitle');
+            const scheduleTime = document.getElementById('scheduleTime');
+            const scheduleLabel = document.getElementById('scheduleLabel');
+            const scheduleDuration = document.getElementById('scheduleDuration');
+            const scheduleModal = document.getElementById('scheduleModal');
+
+            if (modalTitle) modalTitle.textContent = 'Edit Schedule';
+            if (scheduleTime) scheduleTime.value = s.feeding_time?.slice(0, 5) ?? '';
+            if (scheduleLabel) scheduleLabel.value = s.label ?? '';
+            if (scheduleDuration) scheduleDuration.value = s.duration_seconds ?? 5;
+            if (scheduleModal) scheduleModal.classList.add('open');
+        };
+
+        window.closeModal = function () {
+            const scheduleModal = document.getElementById('scheduleModal');
+            if (scheduleModal) scheduleModal.classList.remove('open');
+        };
+
+        window.saveSchedule = async function () {
+            if (!supabaseClient && !isConnected) {
+                showToast('Demo mode: Schedule saved locally', 'success');
+                closeModal();
+                return;
+            }
+
+            const timeInput = document.getElementById('scheduleTime');
+            const labelInput = document.getElementById('scheduleLabel');
+            const durationInput = document.getElementById('scheduleDuration');
+
+            const time = timeInput ? timeInput.value : '';
+            const label = (labelInput ? labelInput.value : '') || 'Feeding';
+            const duration = parseInt(durationInput ? durationInput.value : 5) || 5;
+
+            if (!time) {
+                showToast('Please select a time', 'error');
+                return;
+            }
+
+            try {
+                if (editScheduleId) {
+                    const { error } = await supabaseClient
+                        .from('feeding_schedules')
+                        .update({ feeding_time: time, label, duration_seconds: duration })
+                        .eq('id', editScheduleId);
+
+                    if (error) throw error;
+                    showToast('Schedule updated!', 'success');
+                } else {
+                    const { error } = await supabaseClient
+                        .from('feeding_schedules')
+                        .insert({ feeding_time: time, label, duration_seconds: duration, enabled: true });
+
+                    if (error) throw error;
+                    showToast('Schedule added!', 'success');
+                }
+                closeModal();
+                await fetchSchedules();
+            } catch (err) {
+                console.error('Save schedule error:', err);
+                showToast('Failed to save schedule: ' + err.message, 'error');
+            }
+        };
+
+        window.toggleSchedule = async function (id, enabled) {
+            if (!supabaseClient) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('feeding_schedules')
+                    .update({ enabled })
+                    .eq('id', id);
+
+                if (error) throw error;
+                await fetchSchedules();
+            } catch (err) {
+                console.error('Toggle schedule error:', err);
+                showToast('Failed to toggle schedule', 'error');
+            }
+        };
+
+        window.deleteSchedule = async function (id) {
+            if (!supabaseClient) return;
+            if (!confirm('Delete this schedule?')) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('feeding_schedules')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+                showToast('Schedule deleted', 'success');
+                await fetchSchedules();
+            } catch (err) {
+                console.error('Delete schedule error:', err);
+                showToast('Failed to delete schedule', 'error');
+            }
+        };
+
+        // ============================================
+        // SETTINGS
+        // ============================================
+        async function fetchSettings() {
+            if (!supabaseClient) return;
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('system_settings')
+                    .select('*')
+                    .limit(1);
+
+                if (error) throw error;
+
+                if (data && data[0]) {
+                    settings = { ...settings, ...data[0] };
+
+                    const openAngleInput = document.getElementById('settingOpenAngle');
+                    const closedAngleInput = document.getElementById('settingClosedAngle');
+                    const durationInput = document.getElementById('settingDuration');
+                    const emptyDistanceInput = document.getElementById('settingEmptyDistance');
+                    const fullDistanceInput = document.getElementById('settingFullDistance');
+                    const thresholdInput = document.getElementById('settingThreshold');
+                    const intervalInput = document.getElementById('settingInterval');
+                    const openAngleDisplay = document.getElementById('openAngleDisplay');
+                    const closedAngleDisplay = document.getElementById('closedAngleDisplay');
+                    const durationDisplay = document.getElementById('durationDisplay');
+
+                    if (openAngleInput) openAngleInput.value = settings.servo_open_angle ?? 60;
+                    if (closedAngleInput) closedAngleInput.value = settings.servo_closed_angle ?? 90;
+                    if (durationInput) durationInput.value = settings.dispense_duration ?? 5;
+                    if (emptyDistanceInput) emptyDistanceInput.value = settings.empty_distance_cm ?? 30;
+                    if (fullDistanceInput) fullDistanceInput.value = settings.full_distance_cm ?? 0;
+                    if (thresholdInput) thresholdInput.value = settings.refill_threshold_cm ?? 3;
+                    if (intervalInput) intervalInput.value = settings.sensor_interval ?? 5;
+                    if (openAngleDisplay) openAngleDisplay.textContent = `${settings.servo_open_angle ?? 60}°`;
+                    if (closedAngleDisplay) closedAngleDisplay.textContent = `${settings.servo_closed_angle ?? 90}°`;
+                    if (durationDisplay) durationDisplay.textContent = `${settings.dispense_duration ?? 5}s`;
+                }
+            } catch (err) {
+                console.error('Fetch settings error:', err);
+            }
+        }
+
+        window.saveSettings = async function () {
+            if (!supabaseClient && !isConnected) {
+                showToast('Demo mode: Settings saved locally', 'success');
+                return;
+            }
+
+            const btn = document.querySelector('[onclick="saveSettings()"]');
+            if (btn) {
+                btn.classList.add('loading');
+                btn.disabled = true;
+            }
+
+            const openAngleInput = document.getElementById('settingOpenAngle');
+            const closedAngleInput = document.getElementById('settingClosedAngle');
+            const durationInput = document.getElementById('settingDuration');
+            const emptyDistanceInput = document.getElementById('settingEmptyDistance');
+            const fullDistanceInput = document.getElementById('settingFullDistance');
+            const thresholdInput = document.getElementById('settingThreshold');
+            const intervalInput = document.getElementById('settingInterval');
+
+            settings.servo_open_angle = parseInt(openAngleInput ? openAngleInput.value : 60);
+            settings.servo_closed_angle = parseInt(closedAngleInput ? closedAngleInput.value : 90);
+            settings.dispense_duration = parseInt(durationInput ? durationInput.value : 5);
+            settings.empty_distance_cm = parseFloat(emptyDistanceInput ? emptyDistanceInput.value : 30);
+            settings.full_distance_cm = parseFloat(fullDistanceInput ? fullDistanceInput.value : 0);
+            settings.refill_threshold_cm = parseFloat(thresholdInput ? thresholdInput.value : 3);
+            settings.sensor_interval = parseInt(intervalInput ? intervalInput.value : 5);
+
+            // Ensure full distance is less than empty distance
+            if (settings.full_distance_cm >= settings.empty_distance_cm) {
+                showToast('Full distance must be less than Empty distance', 'error');
+                if (btn) {
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
+                }
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from('system_settings')
+                    .upsert({ id: 1, ...settings });
+
+                if (error) throw error;
+
+                const openAngleDisplay = document.getElementById('openAngleDisplay');
+                const closedAngleDisplay = document.getElementById('closedAngleDisplay');
+                const durationDisplay = document.getElementById('durationDisplay');
+
+                if (openAngleDisplay) openAngleDisplay.textContent = `${settings.servo_open_angle}°`;
+                if (closedAngleDisplay) closedAngleDisplay.textContent = `${settings.servo_closed_angle}°`;
+                if (durationDisplay) durationDisplay.textContent = `${settings.dispense_duration}s`;
+
+                showToast('Settings saved!', 'success');
+
+                // Refresh UI with new settings
+                if (currentDistance) {
+                    updateFoodLevelUI(currentDistance, null);
+                }
+            } catch (err) {
+                console.error('Save settings error:', err);
+                showToast('Failed to save settings: ' + err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
+                }
+            }
+        };
+
+        window.testConnection = async function () {
+            if (!supabaseClient) {
+                showToast('Supabase not initialized', 'error');
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from('sensor_readings')
+                    .select('count', { count: 'exact', head: true });
+
+                if (error) throw error;
+                showToast('Connection successful!', 'success');
+            } catch (err) {
+                console.error('Connection test error:', err);
+                showToast('Connection failed: ' + err.message, 'error');
+            }
+        };
+
+        // ============================================
+        // LOGS
+        // ============================================
+        async function fetchLogs() {
+            if (!supabaseClient) return;
+
+            try {
+                const [{ data: feedLogs, error: feedError }, { data: sensorLogs, error: sensorError }] = await Promise.all([
+                    supabaseClient.from('feeding_logs').select('*').order('created_at', { ascending: false }).limit(100),
+                    supabaseClient.from('sensor_readings').select('*').order('created_at', { ascending: false }).limit(50)
+                ]);
+
+                if (feedError) throw feedError;
+                if (sensorError) throw sensorError;
+
+                allLogs = [];
+
+                feedLogs?.forEach(l => {
+                    allLogs.push({
+                        type: l.type === 'manual' ? 'manual' : (l.type === 'automatic' ? 'auto' : l.type),
+                        message: l.note || l.action,
+                        value: l.servo_angle ? `${l.servo_angle}°` : '',
+                        created_at: l.created_at
+                    });
+                });
+
+                sensorLogs?.forEach(l => {
+                    allLogs.push({
+                        type: 'sensor',
+                        message: `${l.food_level} — ${l.note || 'Sensor reading'}`,
+                        value: `${l.distance_cm?.toFixed(1)}cm`,
+                        created_at: l.created_at
+                    });
+                });
+
+                allLogs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                filterLogs();
+            } catch (err) {
+                console.error('Fetch logs error:', err);
+            }
+        }
+
+        window.filterLogs = function () {
+            const searchInput = document.getElementById('logSearch');
+            const typeFilterSelect = document.getElementById('logTypeFilter');
+            const dateFilterSelect = document.getElementById('logDateFilter');
+
+            const search = searchInput ? searchInput.value.toLowerCase() : '';
+            const typeFilter = typeFilterSelect ? typeFilterSelect.value : 'all';
+            const dateFilter = dateFilterSelect ? dateFilterSelect.value : 'all';
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+
+            const filtered = allLogs.filter(l => {
+                if (typeFilter !== 'all' && l.type !== typeFilter) return false;
+                if (search && !l.message?.toLowerCase().includes(search)) return false;
+                const d = new Date(l.created_at);
+                if (dateFilter === 'today' && d < today) return false;
+                if (dateFilter === 'week' && d < weekAgo) return false;
+                return true;
+            });
+
+            renderLogs(filtered);
+        };
+
+        function renderLogs(logs) {
+            const container = document.getElementById('logList');
+            if (!container) return;
+
+            if (logs.length === 0) {
+                container.innerHTML = `<div class="empty-state"><i class="fas fa-list-ul"></i><div>No logs found</div></div>`;
+                return;
+            }
+
+            const icons = { manual: 'fa-hand-pointer', auto: 'fa-robot', sensor: 'fa-broadcast-tower', alert: 'fa-exclamation-triangle', error: 'fa-times-circle', system: 'fa-server', wifi: 'fa-wifi' };
+
+            container.innerHTML = logs.slice(0, 100).map(l => {
+                const d = new Date(l.created_at);
+                const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const date = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                const icon = icons[l.type] || 'fa-circle';
+                return `
+    <div class="log-entry">
+      <div class="log-time">${date} ${time}</div>
+      <div class="log-message"><i class="fas ${icon}" style="margin-right:6px;opacity:0.6;font-size:0.8rem;"></i>${l.message}</div>
+      <div class="log-badge ${l.type}">${l.type}</div>
+      <div class="log-value">${l.value || ''}</div>
+    </div>`;
+            }).join('');
+        }
+
+        window.exportLogs = function () {
+            const rows = [['Time', 'Type', 'Message', 'Value']];
+            allLogs.forEach(l => {
+                rows.push([new Date(l.created_at).toLocaleString(), l.type, l.message, l.value || '']);
+            });
+            const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'solarfeed_logs.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Logs exported!', 'success');
+        };
+
+        // ============================================
+        // ANALYTICS
+        // ============================================
+        window.updateAnalytics = async function () {
+            if (!supabaseClient) return;
+
+            const rangeSelect = document.getElementById('analyticsRange');
+            const range = rangeSelect ? rangeSelect.value : '24h';
+
+            const since = new Date();
+            if (range === '7d') since.setDate(since.getDate() - 7);
+            else if (range === '30d') since.setDate(since.getDate() - 30);
+            else since.setHours(since.getHours() - 24);
+
+            try {
+                const { data: readings, error: readingsError } = await supabaseClient
+                    .from('sensor_readings')
+                    .select('*')
+                    .gte('created_at', since.toISOString())
+                    .order('created_at');
+
+                if (readingsError) throw readingsError;
+
+                if (readings && readings.length > 0) {
+                    const avgPct = readings.reduce((s, r) => s + (r.food_percentage ?? getFoodPercentage(r.distance_cm)), 0) / readings.length;
+                    const metricAvgLevel = document.getElementById('metricAvgLevel');
+                    const metricReadings = document.getElementById('metricReadings');
+
+                    if (metricAvgLevel) metricAvgLevel.textContent = Math.round(avgPct) + '%';
+                    if (metricReadings) metricReadings.textContent = readings.length;
+
+                    buildFoodLevelChart(readings);
+                    buildDistanceChart(readings);
+                }
+
+                const { data: logs, error: logsError } = await supabaseClient
+                    .from('feeding_logs')
+                    .select('*')
+                    .gte('created_at', since.toISOString())
+                    .order('created_at');
+
+                if (logsError) throw logsError;
+
+                if (logs) buildDispenseChart(logs, since, range);
+            } catch (err) {
+                console.error('Analytics error:', err);
+            }
+        };
+
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5a8a62', font: { size: 10 } } },
+                y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5a8a62', font: { size: 10 } } }
+            }
+        };
+
+        function buildFoodLevelChart(readings) {
+            const canvas = document.getElementById('foodLevelChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const labels = readings.map(r => new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            const data = readings.map(r => r.food_percentage ?? getFoodPercentage(r.distance_cm));
+
+            if (foodLevelChart) foodLevelChart.destroy();
+
+            foodLevelChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        data,
+                        borderColor: '#34a853',
+                        backgroundColor: 'rgba(52,168,83,0.08)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        borderWidth: 2
+                    }]
+                },
+                options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 0, max: 100 } } }
+            });
+        }
+
+        function buildDistanceChart(readings) {
+            const canvas = document.getElementById('distanceChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const labels = readings.map(r => new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            const data = readings.map(r => r.distance_cm);
+
+            if (distanceChart) distanceChart.destroy();
+
+            distanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        data,
+                        borderColor: '#42a5f5',
+                        backgroundColor: 'rgba(66,165,245,0.06)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        borderWidth: 2
+                    }]
+                },
+                options: chartDefaults
+            });
+        }
+
+        function buildDispenseChart(logs, since, range) {
+            const canvas = document.getElementById('dispenseChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const buckets = {};
+            const hrs = range === '24h' ? 24 : range === '7d' ? 7 : 30;
+            const unit = range === '24h' ? 'hour' : 'day';
+
+            for (let i = 0; i < hrs; i++) {
+                const d = new Date(since);
+                if (unit === 'hour') d.setHours(d.getHours() + i);
+                else d.setDate(d.getDate() + i);
+                const key = unit === 'hour' ? d.toLocaleTimeString([], { hour: '2-digit' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                buckets[key] = 0;
+            }
+
+            logs.forEach(l => {
+                const d = new Date(l.created_at);
+                const key = unit === 'hour' ? d.toLocaleTimeString([], { hour: '2-digit' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                if (key in buckets) buckets[key]++;
+            });
+
+            if (dispenseChart) dispenseChart.destroy();
+
+            dispenseChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(buckets),
+                    datasets: [{
+                        data: Object.values(buckets),
+                        backgroundColor: 'rgba(52,168,83,0.6)',
+                        borderColor: '#34a853',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: chartDefaults
+            });
+        }
+
+        // ============================================
+        // NAVIGATION
+        // ============================================
+        window.showSection = function (name) {
+            document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+            const section = document.getElementById('section-' + name);
+            if (section) section.classList.add('active');
+
+            const btns = document.querySelectorAll('.nav-btn');
+            const idx = ['dashboard', 'schedule', 'analytics', 'logs', 'settings'].indexOf(name);
+            if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
+
+            if (name === 'analytics') updateAnalytics();
+            if (name === 'logs') fetchLogs();
+        };
+
+        // ============================================
+        // THEME
+        // ============================================
+        window.toggleTheme = function () {
+            const html = document.documentElement;
+            const isDark = html.getAttribute('data-theme') === 'dark';
+            html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            const themeIcon = document.getElementById('themeIcon');
+            if (themeIcon) themeIcon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+            localStorage.setItem('sf-theme', isDark ? 'light' : 'dark');
+        };
+
+        // ============================================
+        // CLOCK
+        // ============================================
+        function updateClock() {
+            const clockDisplay = document.getElementById('clockDisplay');
+            if (clockDisplay) {
+                const now = new Date();
+                clockDisplay.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+        }
+
+        // ============================================
+        // INIT
+        // ============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, initializing dashboard...');
+
+            // Theme
+            const savedTheme = localStorage.getItem('sf-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            const themeIcon = document.getElementById('themeIcon');
+            if (themeIcon) themeIcon.className = savedTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+
+            // Clock
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            // Auto refresh every 30 seconds
+            setInterval(() => {
+                if (isConnected) fetchLatestData();
+            }, 30000);
+
+            // Initialize Supabase
+            initSupabase();
+
+            // Close modal on backdrop click
+            const scheduleModal = document.getElementById('scheduleModal');
+            if (scheduleModal) {
+                scheduleModal.addEventListener('click', (e) => {
+                    if (e.target === scheduleModal) closeModal();
                 });
             }
-        }
 
-        async function initSupabase() {
-            try {
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                isSupabaseConfigured = true;
-
-                // Test connection
-                const { error } = await supabaseClient.from('sensor_readings').select('count', { count: 'exact', head: true });
-                if (error) {
-                    console.error("Table missing or RLS error:", error);
-                    supabaseStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ⚠️ Tables missing. Run SQL schema first.';
-                    isSupabaseConfigured = false;
-                    return;
-                }
-
-                supabaseStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✅ Connected to Supabase';
-
-                // Realtime subscriptions
-                supabaseClient.channel('public:sensor_readings')
-                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sensor_readings' }, () => {
-                        fetchLatestData();
-                    })
-                    .subscribe();
-
-                supabaseClient.channel('public:servo_state')
-                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'servo_state' }, (payload) => {
-                        if (payload.new) updateServoUI(payload.new.state);
-                    })
-                    .subscribe();
-
-                await fetchLatestData();
-                servoBtn.onclick = toggleServoState;
-
-                console.log("✅ Supabase initialized successfully - Real mode active!");
-            } catch (err) {
-                console.error('Supabase init error:', err);
-                supabaseStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ❌ Connection failed';
-                isSupabaseConfigured = false;
-            }
-        }
-
-        initSupabase();
+            // Enable any stuck buttons after 3 seconds
+            setTimeout(() => {
+                document.querySelectorAll('.btn').forEach(btn => {
+                    if (btn.disabled) {
+                        btn.disabled = false;
+                        btn.classList.remove('loading');
+                    }
+                });
+            }, 3000);
+        });
     </script>
 </body>
 
