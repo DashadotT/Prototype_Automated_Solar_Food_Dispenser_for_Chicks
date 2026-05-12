@@ -2203,6 +2203,22 @@
                         </div>
                         <div class="setting-row">
                             <div>
+                                <div class="setting-label">Empty Distance</div>
+                                <div class="setting-desc">Distance (cm) when container is empty (max range)</div>
+                            </div>
+                            <input type="number" class="setting-input" id="settingEmptyDistance" value="30" min="5"
+                                max="100" step="1">
+                        </div>
+                        <div class="setting-row">
+                            <div>
+                                <div class="setting-label">Full Distance</div>
+                                <div class="setting-desc">Distance (cm) when container is full (min range)</div>
+                            </div>
+                            <input type="number" class="setting-input" id="settingFullDistance" value="0" min="0"
+                                max="30" step="1">
+                        </div>
+                        <div class="setting-row">
+                            <div>
                                 <div class="setting-label">Refill Threshold</div>
                                 <div class="setting-desc">Distance (cm) triggering low food alert</div>
                             </div>
@@ -2294,6 +2310,8 @@
             servo_open_angle: 60,
             servo_closed_angle: 90,
             dispense_duration: 5,
+            empty_distance_cm: 30,      // NEW: Max distance when empty
+            full_distance_cm: 0,        // NEW: Min distance when full
             refill_threshold_cm: 3,
             sensor_interval: 5
         };
@@ -2553,18 +2571,34 @@
         // ============================================
         // FOOD LEVEL UI
         // ============================================
-        function getFoodLevel(cm) {
-            if (!cm || cm < 0) return { level: 'Unknown', pct: 0, cls: 'empty' };
-            if (cm <= 5) return { level: 'Full', pct: 100, cls: 'full' };
-            if (cm <= 10) return { level: 'Medium', pct: 65, cls: 'medium' };
-            if (cm <= 20) return { level: 'Low', pct: 30, cls: 'low' };
-            return { level: 'Empty', pct: 5, cls: 'empty' };
+        function getFoodPercentage(cm, maxCm = null, minCm = null) {
+            if (!cm || cm < 0) return 0;
+            // Use settings if available, otherwise use defaults
+            const maxDistance = (maxCm !== null) ? maxCm : (settings.empty_distance_cm || 30);
+            const minDistance = (minCm !== null) ? minCm : (settings.full_distance_cm || 0);
+
+            // Clamp the distance between min and max
+            const clampedCm = Math.min(Math.max(cm, minDistance), maxDistance);
+
+            // Calculate percentage: 100% when distance = min (full), 0% when distance = max (empty)
+            const pct = ((maxDistance - clampedCm) / (maxDistance - minDistance)) * 100;
+            return Math.round(Math.max(0, Math.min(100, pct)));
         }
 
-        function getFoodPercentage(cm, maxCm = 30) {
-            if (!cm || cm < 0) return 0;
-            const pct = Math.max(0, Math.min(100, ((maxCm - cm) / maxCm) * 100));
-            return Math.round(pct);
+        function getFoodLevel(cm) {
+            if (!cm || cm < 0) return { level: 'Unknown', pct: 0, cls: 'empty' };
+
+            const emptyDist = settings.empty_distance_cm || 30;
+            const fullDist = settings.full_distance_cm || 0;
+
+            // Calculate percentage for level thresholds
+            const range = emptyDist - fullDist;
+            const pct = ((emptyDist - cm) / range) * 100;
+
+            if (pct >= 85) return { level: 'Full', pct: 100, cls: 'full' };
+            if (pct >= 50) return { level: 'Medium', pct: 65, cls: 'medium' };
+            if (pct >= 15) return { level: 'Low', pct: 30, cls: 'low' };
+            return { level: 'Empty', pct: 5, cls: 'empty' };
         }
 
         function updateFoodLevelUI(distanceCm, foodPct) {
@@ -3114,6 +3148,8 @@
                     const openAngleInput = document.getElementById('settingOpenAngle');
                     const closedAngleInput = document.getElementById('settingClosedAngle');
                     const durationInput = document.getElementById('settingDuration');
+                    const emptyDistanceInput = document.getElementById('settingEmptyDistance');
+                    const fullDistanceInput = document.getElementById('settingFullDistance');
                     const thresholdInput = document.getElementById('settingThreshold');
                     const intervalInput = document.getElementById('settingInterval');
                     const openAngleDisplay = document.getElementById('openAngleDisplay');
@@ -3123,6 +3159,8 @@
                     if (openAngleInput) openAngleInput.value = settings.servo_open_angle ?? 60;
                     if (closedAngleInput) closedAngleInput.value = settings.servo_closed_angle ?? 90;
                     if (durationInput) durationInput.value = settings.dispense_duration ?? 5;
+                    if (emptyDistanceInput) emptyDistanceInput.value = settings.empty_distance_cm ?? 30;
+                    if (fullDistanceInput) fullDistanceInput.value = settings.full_distance_cm ?? 0;
                     if (thresholdInput) thresholdInput.value = settings.refill_threshold_cm ?? 3;
                     if (intervalInput) intervalInput.value = settings.sensor_interval ?? 5;
                     if (openAngleDisplay) openAngleDisplay.textContent = `${settings.servo_open_angle ?? 60}°`;
@@ -3149,14 +3187,28 @@
             const openAngleInput = document.getElementById('settingOpenAngle');
             const closedAngleInput = document.getElementById('settingClosedAngle');
             const durationInput = document.getElementById('settingDuration');
+            const emptyDistanceInput = document.getElementById('settingEmptyDistance');
+            const fullDistanceInput = document.getElementById('settingFullDistance');
             const thresholdInput = document.getElementById('settingThreshold');
             const intervalInput = document.getElementById('settingInterval');
 
             settings.servo_open_angle = parseInt(openAngleInput ? openAngleInput.value : 60);
             settings.servo_closed_angle = parseInt(closedAngleInput ? closedAngleInput.value : 90);
             settings.dispense_duration = parseInt(durationInput ? durationInput.value : 5);
+            settings.empty_distance_cm = parseFloat(emptyDistanceInput ? emptyDistanceInput.value : 30);
+            settings.full_distance_cm = parseFloat(fullDistanceInput ? fullDistanceInput.value : 0);
             settings.refill_threshold_cm = parseFloat(thresholdInput ? thresholdInput.value : 3);
             settings.sensor_interval = parseInt(intervalInput ? intervalInput.value : 5);
+
+            // Ensure full distance is less than empty distance
+            if (settings.full_distance_cm >= settings.empty_distance_cm) {
+                showToast('Full distance must be less than Empty distance', 'error');
+                if (btn) {
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
+                }
+                return;
+            }
 
             try {
                 const { error } = await supabaseClient
@@ -3174,6 +3226,11 @@
                 if (durationDisplay) durationDisplay.textContent = `${settings.dispense_duration}s`;
 
                 showToast('Settings saved!', 'success');
+
+                // Refresh UI with new settings
+                if (currentDistance) {
+                    updateFoodLevelUI(currentDistance, null);
+                }
             } catch (err) {
                 console.error('Save settings error:', err);
                 showToast('Failed to save settings: ' + err.message, 'error');

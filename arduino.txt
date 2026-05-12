@@ -40,9 +40,11 @@ const int DAYLIGHT_OFFSET = 0;
 // ============================================================
 int SERVO_CLOSED_ANGLE = 90;
 int SERVO_OPEN_ANGLE = 60;
-int DISPENSE_DURATION = 5;     // seconds
-float REFILL_THRESHOLD = 3.0;  // cm
-int SENSOR_INTERVAL = 5000;    // ms
+int DISPENSE_DURATION = 5;       // seconds
+float REFILL_THRESHOLD = 3.0;    // cm
+int SENSOR_INTERVAL = 5000;      // ms
+float EMPTY_DISTANCE_CM = 30.0;  // Max distance when container is empty
+float FULL_DISTANCE_CM = 0.0;    // Min distance when container is full
 
 // ============================================================
 // 📝 FUNCTION PROTOTYPES (forward declarations)
@@ -236,15 +238,32 @@ float measureDistanceSmoothed() {
 
 String getFoodLevel(float cm) {
   if (cm < 0) return "Unknown";
-  if (cm <= 5) return "Full";
-  if (cm <= 10) return "Medium";
-  if (cm <= 20) return "Low";
+
+  // Calculate percentage based on empty/full distances
+  float range = EMPTY_DISTANCE_CM - FULL_DISTANCE_CM;
+  if (range <= 0) range = 30.0;  // fallback
+
+  float pct = ((EMPTY_DISTANCE_CM - cm) / range) * 100.0f;
+  pct = constrain(pct, 0, 100);
+
+  if (pct >= 85) return "Full";
+  if (pct >= 50) return "Medium";
+  if (pct >= 15) return "Low";
   return "Empty";
 }
 
 int getFoodPercentage(float cm) {
-  float maxCm = 30.0;
-  int pct = (int)(((maxCm - cm) / maxCm) * 100.0f);
+  if (cm < 0) return 0;
+
+  // Use dynamic empty/full distances
+  float maxCm = EMPTY_DISTANCE_CM;
+  float minCm = FULL_DISTANCE_CM;
+
+  // Clamp the distance between min and max
+  float clampedCm = constrain(cm, minCm, maxCm);
+
+  // Calculate percentage: 100% when distance = min (full), 0% when distance = max (empty)
+  int pct = (int)(((maxCm - clampedCm) / (maxCm - minCm)) * 100.0f);
   return constrain(pct, 0, 100);
 }
 
@@ -476,7 +495,7 @@ void fetchSettings() {
   String response = httpGET(buildUrl("system_settings", "?limit=1"));
   if (response.isEmpty()) return;
 
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<512> doc;  // Increased size for more settings
   if (deserializeJson(doc, response) != DeserializationError::Ok) return;
   if (!doc[0].is<JsonObject>()) return;
 
@@ -487,8 +506,20 @@ void fetchSettings() {
   REFILL_THRESHOLD = s["refill_threshold_cm"] | REFILL_THRESHOLD;
   SENSOR_INTERVAL = (s["sensor_interval"] | 5) * 1000;
 
-  Serial.printf("⚙️ Settings: Open=%d° Closed=%d° Duration=%ds Threshold=%.1fcm\n",
-                SERVO_OPEN_ANGLE, SERVO_CLOSED_ANGLE, DISPENSE_DURATION, REFILL_THRESHOLD);
+  // NEW: Load empty/full distance settings
+  EMPTY_DISTANCE_CM = s["empty_distance_cm"] | EMPTY_DISTANCE_CM;
+  FULL_DISTANCE_CM = s["full_distance_cm"] | FULL_DISTANCE_CM;
+
+  // Validate settings - ensure empty > full
+  if (EMPTY_DISTANCE_CM <= FULL_DISTANCE_CM) {
+    EMPTY_DISTANCE_CM = 30.0;
+    FULL_DISTANCE_CM = 0.0;
+    Serial.println("⚠️ Invalid distance settings, using defaults");
+  }
+
+  Serial.printf("⚙️ Settings: Open=%d° Closed=%d° Duration=%ds Threshold=%.1fcm Empty=%.1fcm Full=%.1fcm\n",
+                SERVO_OPEN_ANGLE, SERVO_CLOSED_ANGLE, DISPENSE_DURATION,
+                REFILL_THRESHOLD, EMPTY_DISTANCE_CM, FULL_DISTANCE_CM);
 }
 
 // ============================================================
@@ -636,3 +667,6 @@ void loop() {
 
   delay(50);
 }
+
+
+This is version 2

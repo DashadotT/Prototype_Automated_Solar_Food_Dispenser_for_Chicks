@@ -217,3 +217,18 @@ BEGIN
   WHERE created_at < NOW() - INTERVAL '30 days';
 END;
 $$ LANGUAGE plpgsql;
+
+
+
+
+
+
+-- Add new columns to system_settings table
+ALTER TABLE system_settings 
+ADD COLUMN IF NOT EXISTS empty_distance_cm DECIMAL(5,2) DEFAULT 30,
+ADD COLUMN IF NOT EXISTS full_distance_cm DECIMAL(5,2) DEFAULT 0;
+
+-- Update the default row
+UPDATE system_settings 
+SET empty_distance_cm = 30, full_distance_cm = 0 
+WHERE id = 1;
